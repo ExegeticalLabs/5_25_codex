@@ -845,14 +845,14 @@ function RestFlipDigits({ value, label, isUrgent, themeObj, large = false }) {
   return (
     <div className="flex flex-col items-center">
       <div
-        className={`relative overflow-hidden border flex items-center justify-center bg-black ${large ? 'w-[140px] sm:w-[174px] h-[160px] sm:h-[198px] rounded-[22px]' : 'w-[120px] sm:w-[150px] h-[140px] sm:h-[170px] rounded-[18px]'}`}
+        className={`relative overflow-hidden border flex items-center justify-center bg-black ${large ? 'w-[min(36vw,148px)] h-[min(42vw,170px)] rounded-[22px]' : 'w-[120px] sm:w-[150px] h-[140px] sm:h-[170px] rounded-[18px]'}`}
         style={{ borderColor: isUrgent ? 'rgba(255,209,102,0.6)' : 'rgba(255,255,255,0.16)' }}
       >
-        <span className={`flex items-center justify-center leading-none tabular-nums ${large ? 'gap-[3px] sm:gap-[4px]' : 'gap-[2px] sm:gap-[3px]'}`}>
+        <span className={`flex items-center justify-center leading-none tabular-nums ${large ? 'gap-[2px] sm:gap-[3px]' : 'gap-[2px] sm:gap-[3px]'}`}>
           {chars.map((char, idx) => (
             <span
               key={idx}
-              className={`rest-flip-digit ${changedFlags[idx] ? 'rest-flip-digit--animate' : ''} inline-block text-center min-w-[0.56ch] font-black leading-none ${large ? 'text-[92px] sm:text-[124px]' : 'text-[80px] sm:text-[106px]'}`}
+              className={`rest-flip-digit ${changedFlags[idx] ? 'rest-flip-digit--animate' : ''} inline-block text-center min-w-[0.56ch] font-black leading-none ${large ? 'text-[min(23vw,96px)]' : 'text-[80px] sm:text-[106px]'}`}
               style={{ color: isUrgent ? '#FFD166' : '#F8FAFC' }}
             >
               {char}
@@ -1262,11 +1262,11 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
         <button onClick={onCancel} className="h-11 w-11 border rounded-xl flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ borderColor: 'rgba(255,255,255,0.26)', color: '#FFF', backgroundColor: 'rgba(0,0,0,0.28)' }} aria-label="Exit cardio"><X size={22} /></button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 z-20 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 z-20 text-center">
         <p className="text-[12px] font-black uppercase tracking-[0.26em] text-white opacity-60">Round {currentRound} of 5</p>
-        <div className={`mt-3 flex items-center gap-3 sm:gap-4 ${isFinalCountdown ? 'animate-pulse' : ''}`}>
+        <div className={`mt-3 flex items-center gap-1 sm:gap-2 ${isFinalCountdown ? 'animate-pulse' : ''}`}>
           <RestFlipDigits value={cardioMinutes} label="MIN" isUrgent={isFinalCountdown} themeObj={themeObj} large />
-          <span className="text-[76px] sm:text-[96px] font-black pb-7" style={{ color: isFinalCountdown ? '#FFD166' : '#F8FAFC' }}>:</span>
+          <span className="text-[min(19vw,80px)] font-black pb-7" style={{ color: isFinalCountdown ? '#FFD166' : '#F8FAFC' }}>:</span>
           <RestFlipDigits value={cardioSeconds} label="SEC" isUrgent={isFinalCountdown} themeObj={themeObj} large />
         </div>
         <p className="mt-3 text-[34px] font-black uppercase tracking-tight" style={{ color: zoneColor }}>{currentZoneName}</p>
