@@ -25,4 +25,31 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+
+  # On macOS Desktop/iCloud-backed folders, copied frameworks can carry
+  # Finder/file-provider extended attributes that break codesign.
+  frameworks_script = File.join(__dir__, 'Pods', 'Target Support Files', 'Pods-App', 'Pods-App-frameworks.sh')
+  if File.exist?(frameworks_script)
+    script = File.read(frameworks_script)
+    scrub_line = '  xattr -cr "${destination}/$(basename "$1")" || true'
+    app_scrub_line = 'xattr -cr "${TARGET_BUILD_DIR}/${WRAPPER_NAME}" || true'
+
+    unless script.include?(scrub_line)
+      rsync_line = '  rsync --delete -av "${RSYNC_PROTECT_TMP_FILES[@]}" --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "${source}" "${destination}"'
+      if script.include?(rsync_line)
+        script.sub!(rsync_line, "#{rsync_line}\n#{scrub_line}")
+      end
+    end
+
+    unless script.include?(app_scrub_line)
+      wait_line = 'if [ "${COCOAPODS_PARALLEL_CODE_SIGN}" == "true" ]; then'
+      if script.include?(wait_line)
+        script.sub!(wait_line, "#{app_scrub_line}\n\n#{wait_line}")
+      else
+        script << "\n#{app_scrub_line}\n"
+      end
+    end
+
+    File.write(frameworks_script, script)
+  end
 end
