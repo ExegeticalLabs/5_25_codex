@@ -821,7 +821,7 @@ function SwipeableExerciseRow({
   );
 }
 
-function RestFlipDigits({ value, label, isUrgent, themeObj }) {
+function RestFlipDigits({ value, label, isUrgent, themeObj, large = false }) {
   const chars = useMemo(() => String(value).split(''), [value]);
   const [changedFlags, setChangedFlags] = useState(() => chars.map(() => false));
   const prevCharsRef = useRef(chars);
@@ -845,14 +845,14 @@ function RestFlipDigits({ value, label, isUrgent, themeObj }) {
   return (
     <div className="flex flex-col items-center">
       <div
-        className="relative overflow-hidden w-[120px] sm:w-[150px] h-[140px] sm:h-[170px] rounded-[18px] border flex items-center justify-center bg-black"
+        className={`relative overflow-hidden border flex items-center justify-center bg-black ${large ? 'w-[140px] sm:w-[174px] h-[160px] sm:h-[198px] rounded-[22px]' : 'w-[120px] sm:w-[150px] h-[140px] sm:h-[170px] rounded-[18px]'}`}
         style={{ borderColor: isUrgent ? 'rgba(255,209,102,0.6)' : 'rgba(255,255,255,0.16)' }}
       >
-        <span className="flex items-center justify-center gap-[2px] sm:gap-[3px] leading-none tabular-nums">
+        <span className={`flex items-center justify-center leading-none tabular-nums ${large ? 'gap-[3px] sm:gap-[4px]' : 'gap-[2px] sm:gap-[3px]'}`}>
           {chars.map((char, idx) => (
             <span
               key={idx}
-              className={`rest-flip-digit ${changedFlags[idx] ? 'rest-flip-digit--animate' : ''} inline-block text-center min-w-[0.56ch] text-[80px] sm:text-[106px] font-black leading-none`}
+              className={`rest-flip-digit ${changedFlags[idx] ? 'rest-flip-digit--animate' : ''} inline-block text-center min-w-[0.56ch] font-black leading-none ${large ? 'text-[92px] sm:text-[124px]' : 'text-[80px] sm:text-[106px]'}`}
               style={{ color: isUrgent ? '#FFD166' : '#F8FAFC' }}
             >
               {char}
@@ -870,7 +870,7 @@ function RestFlipDigits({ value, label, isUrgent, themeObj }) {
           }}
         />
       </div>
-      <span className="mt-2 text-[10px] font-black uppercase tracking-[0.24em]" style={{ color: isUrgent ? '#FFD166' : 'rgba(255,255,255,0.55)' }}>{label}</span>
+      <span className={`font-black uppercase ${large ? 'mt-3 text-[11px] tracking-[0.22em]' : 'mt-2 text-[10px] tracking-[0.24em]'}`} style={{ color: isUrgent ? '#FFD166' : 'rgba(255,255,255,0.55)' }}>{label}</span>
     </div>
   );
 }
@@ -1121,6 +1121,8 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
   const zoneDuration = zone === 'C' ? 60 : 120;
   const zoneElapsed = zone === 'A' ? timeInRound : zone === 'B' ? timeInRound - 120 : timeInRound - 240;
   const zoneTimeLeft = zoneDuration - zoneElapsed;
+  const cardioMinutes = String(Math.floor(zoneTimeLeft / 60));
+  const cardioSeconds = String(zoneTimeLeft % 60).padStart(2, '0');
   const zoneProgressPct = Math.max(0, Math.min(100, (zoneElapsed / zoneDuration) * 100));
   const zoneColor = zone === 'A' ? themeObj.zoneA : zone === 'B' ? themeObj.zoneB : themeObj.zoneC;
   const nextZone = zone === 'A' ? 'Zone B' : zone === 'B' ? 'Zone C' : currentRound === 5 ? 'Complete' : 'Zone A';
@@ -1262,7 +1264,11 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 z-20 text-center">
         <p className="text-[12px] font-black uppercase tracking-[0.26em] text-white opacity-60">Round {currentRound} of 5</p>
-        <h2 className={`mt-2 text-[min(34vw,170px)] leading-none font-black tabular-nums text-white tracking-tight ${isFinalCountdown ? 'animate-pulse' : ''}`}>{formatTime(zoneTimeLeft)}</h2>
+        <div className={`mt-3 flex items-center gap-3 sm:gap-4 ${isFinalCountdown ? 'animate-pulse' : ''}`}>
+          <RestFlipDigits value={cardioMinutes} label="MIN" isUrgent={isFinalCountdown} themeObj={themeObj} large />
+          <span className="text-[76px] sm:text-[96px] font-black pb-7" style={{ color: isFinalCountdown ? '#FFD166' : '#F8FAFC' }}>:</span>
+          <RestFlipDigits value={cardioSeconds} label="SEC" isUrgent={isFinalCountdown} themeObj={themeObj} large />
+        </div>
         <p className="mt-3 text-[34px] font-black uppercase tracking-tight" style={{ color: zoneColor }}>{currentZoneName}</p>
         <p className="mt-1 text-[11px] font-black uppercase tracking-[0.2em] text-white opacity-60">Next: {nextZone}</p>
         {lastTarget && (
