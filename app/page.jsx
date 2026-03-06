@@ -638,7 +638,20 @@ function HubScreen({ db, setDb, onNavigate, themeObj }) {
 // WORKOUT SESSION COMPONENTS
 // =====================================================
 
-function SwipeableExerciseRow({ exercise, weight, onWeightChange, exerciseCompletedSets, currentLogs, pastHistoryLogs, onCompleteSet, onUndoSet, hapticsEnabled, themeObj, currentCycleFloor }) {
+function SwipeableExerciseRow({
+  exercise,
+  weight,
+  onWeightChange,
+  exerciseCompletedSets,
+  currentLogs,
+  pastHistoryLogs,
+  onCompleteSet,
+  onUndoSet,
+  hapticsEnabled,
+  themeObj,
+  currentCycleFloor,
+  isCurrentExercise
+}) {
   const [dragX, setDragX] = useState(0);
   const [startX, setStartX] = useState(null);
   const [startY, setStartY] = useState(null);
@@ -647,7 +660,6 @@ function SwipeableExerciseRow({ exercise, weight, onWeightChange, exerciseComple
 
   const SWIPE_THRESHOLD = 90;
   const completedCount = exerciseCompletedSets || 0;
-
   const isCompleteForThisCycle = completedCount > currentCycleFloor;
 
   const hasLimitReached = useMemo(() => (currentLogs || []).some((l) => l.status === 'limit'), [currentLogs]);
@@ -714,7 +726,7 @@ function SwipeableExerciseRow({ exercise, weight, onWeightChange, exerciseComple
     );
   }
 
-  const bgFill = isCompleteForThisCycle ? (hasLimitReached ? themeObj.danger : themeObj.success) : themeObj.card;
+  const bgFill = isCompleteForThisCycle ? (hasLimitReached ? themeObj.danger : themeObj.success) : isCurrentExercise ? themeObj.bg : themeObj.card;
   const contrastColor = isCompleteForThisCycle ? '#FFFFFF' : themeObj.text;
   const statusLabel = hasLimitReached ? 'LIMIT' : 'APPROVED';
 
@@ -725,7 +737,14 @@ function SwipeableExerciseRow({ exercise, weight, onWeightChange, exerciseComple
       </div>
       <div
         className="relative z-10 p-6 flex justify-between items-center transition-all duration-300 select-none touch-pan-y"
-        style={{ backgroundColor: bgFill, transform: `translateX(${dragX}px)`, transition: isSwiping ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.4s ease', border: `2px solid ${isCompleteForThisCycle ? 'transparent' : themeObj.border}`, borderRadius: '24px' }}
+        style={{
+          backgroundColor: bgFill,
+          transform: `translateX(${dragX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.35s ease',
+          border: `2px solid ${isCompleteForThisCycle ? 'transparent' : isCurrentExercise ? themeObj.primary : themeObj.border}`,
+          borderRadius: '24px',
+          boxShadow: isCurrentExercise && !isCompleteForThisCycle ? `0 10px 28px -16px ${themeObj.primary}` : 'none'
+        }}
         onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); handleStart(e.clientX, e.clientY); }}
         onPointerMove={(e) => handleMove(e.clientX, e.clientY)}
         onPointerUp={handleEnd}
@@ -738,6 +757,7 @@ function SwipeableExerciseRow({ exercise, weight, onWeightChange, exerciseComple
               <span className="text-[12px] font-black uppercase tracking-[0.2em] opacity-80" style={{ color: '#FFF' }}>{statusLabel}</span>
             ) : (
               <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {isCurrentExercise && <span className="text-[10px] font-black uppercase tracking-[0.16em] px-2 py-0.5 rounded" style={{ backgroundColor: themeObj.primary, color: '#fff' }}>CURRENT</span>}
                 <span className="text-[11px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-opacity-10" style={{ backgroundColor: themeObj.primary, color: themeObj.primary }}>10 REPS</span>
                 <span className="text-[10px] font-black uppercase tracking-widest" style={advice.style}>{advice.text}</span>
               </div>
@@ -801,6 +821,22 @@ function SwipeableExerciseRow({ exercise, weight, onWeightChange, exerciseComple
   );
 }
 
+function RestFlipDigits({ value, label, isUrgent, themeObj }) {
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        className="w-[120px] sm:w-[150px] h-[140px] sm:h-[170px] rounded-[18px] border flex items-center justify-center bg-black"
+        style={{ borderColor: isUrgent ? 'rgba(255,209,102,0.6)' : 'rgba(255,255,255,0.16)' }}
+      >
+        <span key={`${label}-${value}`} className="rest-flip-digit text-[80px] sm:text-[106px] font-black leading-none tabular-nums" style={{ color: isUrgent ? '#FFD166' : '#F8FAFC' }}>
+          {value}
+        </span>
+      </div>
+      <span className="mt-2 text-[10px] font-black uppercase tracking-[0.24em]" style={{ color: isUrgent ? '#FFD166' : 'rgba(255,255,255,0.55)' }}>{label}</span>
+    </div>
+  );
+}
+
 function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride, themeObj }) {
   const currentSlotType = workoutTypeOverride || db.slots[db.currentSlotIndex]?.type || 'UPPER';
   const exercises = db.plan[currentSlotType.toLowerCase()] || [];
@@ -819,7 +855,6 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
   const [dismissedAudioGate, setDismissedAudioGate] = useState(false);
   const showAudioGate = beepsEnabled && !audioUnlocked && !dismissedAudioGate;
 
-  const emitCountdown = async () => { if (beepsEnabled && audioUnlocked) await playCountdownTriple(); };
   const emitThud = async () => { if (beepsEnabled && audioUnlocked) await playTransitionThud(); };
   const emitHaptic = (style = 'medium') => { if (db.settings?.haptics) triggerHaptic(style); };
 
@@ -834,6 +869,13 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
     if (exercises.length === 0) return 0;
     return Math.min(...exercises.map((ex) => workoutLogs[ex.id]?.length || 0));
   }, [exercises, workoutLogs]);
+
+  const currentCycle = Math.min(currentCycleFloor + 1, 5);
+  const currentExerciseId = useMemo(() => {
+    const first = exercises.find((ex) => (workoutLogs[ex.id]?.length || 0) === currentCycleFloor);
+    return first?.id || null;
+  }, [exercises, workoutLogs, currentCycleFloor]);
+  const currentExerciseName = exercises.find((ex) => ex.id === currentExerciseId)?.name;
 
   const prevCycleRef = useRef(0);
   useEffect(() => {
@@ -853,10 +895,12 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
     if (isResting && restTime > 0) {
       int = setInterval(() => {
         setRestTime((p) => {
-          if (p === 4 || p === 3 || p === 2) void emitCountdown();
+          if (p <= 10 && p > 0 && db.settings?.haptics) emitHaptic('light');
+          if (p <= 3 && p > 0 && beepsEnabled && audioUnlocked) void playBeep(980, 0.05, 0.06);
           if (p <= 1) {
             setIsResting(false);
             void emitThud();
+            emitHaptic('heavy');
             return 0;
           }
           return p - 1;
@@ -865,11 +909,20 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
     }
     return () => clearInterval(int);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isResting, restTime]);
+  }, [isResting, restTime, beepsEnabled, audioUnlocked, db.settings?.haptics]);
 
   const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
   const allExercisesComplete = exercises.length > 0 && exercises.every((ex) => (workoutLogs[ex.id]?.length || 0) === 5);
   const canFinalize = isManualSession ? Object.values(workoutLogs).flat().length > 0 : allExercisesComplete;
+
+  const restMinutes = String(Math.floor(restTime / 60));
+  const restSeconds = String(restTime % 60).padStart(2, '0');
+  const restUrgent = restTime <= 15;
+  const restHint = currentCycleFloor <= 1
+    ? `Cycle ${currentCycleFloor} complete • Up next: Cycle ${Math.min(currentCycleFloor + 1, 5)}`
+    : currentCycleFloor <= 3
+      ? 'Fail 2–3 = drop load'
+      : 'Fail 4–5 = keep load';
 
   const handleAudioUnlock = async () => {
     const ok = await unlockAudio();
@@ -896,37 +949,34 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
       />
       <BlockedAudioChip beepsEnabled={beepsEnabled} audioUnlocked={audioUnlocked} themeObj={themeObj} onClick={() => setDismissedAudioGate(false)} />
 
-      <TimerOverlay label="SESSION CLOCK" timeStr={formatTime(elapsed)} themeObj={themeObj} />
-
       {isResting && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-opacity-95 backdrop-blur-xl transition-all" style={{ backgroundColor: themeObj.bg }}>
-          <h2 className="text-sm font-black uppercase tracking-[0.3em] mb-4 opacity-60" style={{ color: themeObj.primary }}>Resting Restoration</h2>
-          <div className="text-[24vw] md:text-[120px] font-black tabular-nums tracking-tighter leading-none mb-12" style={{ color: themeObj.text, textShadow: '0 0 40px rgba(0,122,255,0.2)' }}>
-            {Math.floor(restTime / 60)}:{(restTime % 60).toString().padStart(2, '0')}
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center px-6 text-center" style={{ backgroundColor: '#050507' }}>
+          <span className="text-[11px] font-black uppercase tracking-[0.26em] mb-3" style={{ color: restUrgent ? '#FFD166' : 'rgba(255,255,255,0.55)' }}>
+            REST
+          </span>
+          <div className="flex items-center gap-3 sm:gap-5">
+            <RestFlipDigits value={restMinutes} label="MIN" isUrgent={restUrgent} themeObj={themeObj} />
+            <span className="text-[64px] font-black pb-6" style={{ color: restUrgent ? '#FFD166' : '#F8FAFC' }}>:</span>
+            <RestFlipDigits value={restSeconds} label="SEC" isUrgent={restUrgent} themeObj={themeObj} />
           </div>
-          <Card themeObj={themeObj} className="mt-8 mb-12 w-full max-w-sm border-0 shadow-2xl">
-            <h3 className="text-center font-black uppercase text-xs tracking-widest mb-6 opacity-40" style={{ color: themeObj.text }}>Protocol Guidance</h3>
-            <div className="space-y-4 font-bold text-[15px]" style={{ color: themeObj.text }}>
-              <div className="flex justify-between border-b pb-4 border-white border-opacity-5"><span>Limit Cycle 2-3?</span><span style={{ color: themeObj.danger }}>- Weight</span></div>
-              <div className="flex justify-between border-b pb-4 border-white border-opacity-5"><span>Limit Cycle 4-5?</span><span style={{ color: themeObj.primary }}>Keep Weight</span></div>
-              <div className="flex justify-between"><span>Perfect 5 Cycles?</span><span style={{ color: themeObj.success }}>+ Weight</span></div>
-            </div>
-          </Card>
-          <button onClick={() => setIsResting(false)} className="px-10 py-5 rounded-full border-2 font-black uppercase tracking-widest active:scale-90 shadow-lg outline-none focus-visible:ring-4" style={{ borderColor: themeObj.border, color: themeObj.textSecondary }}>Skip Rest</button>
+          <p className="mt-8 text-[12px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(255,255,255,0.68)' }}>{restHint}</p>
         </div>
       )}
 
       <div className="px-6 pt-[safe-lg] pb-5 z-40 relative shadow-sm" style={{ backgroundColor: themeObj.card }}>
         <div className="flex justify-between items-start gap-3">
           <div className="flex-1">
-            <h1 className="text-[32px] font-black tracking-tighter uppercase" style={{ color: themeObj.text }}>{currentSlotType} Session</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[12px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md" style={{ backgroundColor: themeObj.primary, color: '#FFF' }}>
-                Cycle {Math.min(currentCycleFloor + 1, 5)}
-              </span>
-            </div>
+            <span className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: themeObj.primary }}>Sequence Console</span>
+            <h1 className="text-[30px] font-black tracking-tighter uppercase leading-tight" style={{ color: themeObj.text }}>{currentSlotType} Session</h1>
+            <p className="text-[12px] font-black uppercase tracking-[0.2em] opacity-70" style={{ color: themeObj.textSecondary }}>Cycle {currentCycle} of 5{currentExerciseName ? ` • ${currentExerciseName}` : ''}</p>
           </div>
-          <button onClick={onCancel} className="p-2 outline-none focus-visible:ring-2 rounded-full" style={{ color: themeObj.text }} aria-label="Exit workout"><X size={28} /></button>
+          <div className="flex items-start gap-3">
+            <div className="text-right mt-1">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50" style={{ color: themeObj.text }}>Session Clock</span>
+              <div className="text-[16px] font-black tabular-nums" style={{ color: themeObj.text }}>{formatTime(elapsed)}</div>
+            </div>
+            <button onClick={onCancel} className="p-2 outline-none focus-visible:ring-2 rounded-full" style={{ color: themeObj.text }} aria-label="Exit workout"><X size={26} /></button>
+          </div>
         </div>
       </div>
 
@@ -943,6 +993,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
                 key={ex.id}
                 exercise={ex}
                 currentCycleFloor={currentCycleFloor}
+                isCurrentExercise={ex.id === currentExerciseId}
                 weight={weights[ex.id] ?? ''}
                 onWeightChange={(v) => setWeights((prev) => ({ ...prev, [ex.id]: v }))}
                 exerciseCompletedSets={workoutLogs[ex.id]?.length || 0}
@@ -950,7 +1001,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
                 pastHistoryLogs={pastWorkout?.data?.workoutLogs?.[ex.id]}
                 onCompleteSet={(logEntry) => {
                   setWorkoutLogs((prev) => ({ ...prev, [ex.id]: [...(prev[ex.id] || []), logEntry] }));
-                  void playBeep(900, 0.05, 0.1);
+                  if (beepsEnabled && audioUnlocked) void playBeep(860, 0.04, 0.08);
                 }}
                 onUndoSet={() => {
                   setWorkoutLogs((prev) => {
@@ -970,9 +1021,17 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-6 pb-[safe-lg] z-30 bg-opacity-95 backdrop-blur-lg border-t" style={{ backgroundColor: themeObj.card, borderColor: themeObj.border }}>
-        <Button onClick={() => onComplete({ kind: 'STRENGTH', slotType: currentSlotType, elapsed, workoutLogs, totalSets: exercises.length * 5, completedSets: Object.values(workoutLogs).flat().length })} themeObj={themeObj} disabled={!canFinalize} className="py-5 shadow-lg uppercase tracking-widest">
-          {isManualSession || allExercisesComplete ? 'Finalize Workout' : 'Complete All 5 Cycles'}
+        <Button
+          onClick={() => onComplete({ kind: 'STRENGTH', slotType: currentSlotType, elapsed, workoutLogs, totalSets: exercises.length * 5, completedSets: Object.values(workoutLogs).flat().length })}
+          themeObj={themeObj}
+          disabled={!canFinalize}
+          className="py-5 shadow-lg uppercase tracking-widest"
+        >
+          {isManualSession || allExercisesComplete ? 'Finalize Workout' : 'Complete Cycle'}
         </Button>
+        {!allExercisesComplete && !isManualSession && (
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-center mt-3 opacity-45" style={{ color: themeObj.text }}>Complete all 5 exercises to trigger strict 2:00 rest.</p>
+        )}
       </div>
     </div>
   );
@@ -986,6 +1045,7 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
   const [isEnteringCustomEq, setIsEnteringCustomEq] = useState(false);
   const [customEquipment, setCustomEquipment] = useState('');
   const [metrics, setMetrics] = useState({ zoneA: '', zoneB: '', zoneC: '' });
+  const [phasePulse, setPhasePulse] = useState(false);
 
   const { isSupported: wakeLockSupported } = useScreenWakeLock(true);
 
@@ -994,12 +1054,38 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
   const [dismissedAudioGate, setDismissedAudioGate] = useState(false);
   const showAudioGate = beepsEnabled && !audioUnlocked && !dismissedAudioGate;
 
-  const emitCountdown = async () => { if (beepsEnabled && audioUnlocked) await playCountdownTriple(); };
   const emitThud = async () => { if (beepsEnabled && audioUnlocked) await playTransitionThud(); };
   const emitHaptic = (style = 'medium') => { if (db.settings?.haptics) triggerHaptic(style); };
 
   const lastCardio = useMemo(() => db.history.find((h) => h.data?.cardio), [db.history]);
   const lastTarget = lastCardio?.data?.cardio?.metrics;
+
+  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  const timeInRound = elapsed % 300;
+  const currentRound = Math.min(5, Math.floor(elapsed / 300) + 1);
+
+  const zone = timeInRound < 120 ? 'A' : timeInRound < 240 ? 'B' : 'C';
+  const currentZoneName = `Zone ${zone}`;
+  const zoneDuration = zone === 'C' ? 60 : 120;
+  const zoneElapsed = zone === 'A' ? timeInRound : zone === 'B' ? timeInRound - 120 : timeInRound - 240;
+  const zoneTimeLeft = zoneDuration - zoneElapsed;
+  const zoneProgressPct = Math.max(0, Math.min(100, (zoneElapsed / zoneDuration) * 100));
+  const totalProgressPct = Math.max(0, Math.min(100, (elapsed / 1500) * 100));
+  const zoneColor = zone === 'A' ? themeObj.zoneA : zone === 'B' ? themeObj.zoneB : themeObj.zoneC;
+  const nextZone = zone === 'A' ? 'Zone B' : zone === 'B' ? 'Zone C' : currentRound === 5 ? 'Complete' : 'Zone A';
+  const isFinalCountdown = zoneTimeLeft <= 10 && zoneTimeLeft > 0;
+
+  const phaseKey = `${currentRound}-${zone}`;
+  const prevPhaseRef = useRef(phaseKey);
+  useEffect(() => {
+    if (prevPhaseRef.current !== phaseKey) {
+      setPhasePulse(true);
+      const t = setTimeout(() => setPhasePulse(false), 220);
+      prevPhaseRef.current = phaseKey;
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [phaseKey]);
 
   useEffect(() => {
     let int;
@@ -1007,16 +1093,19 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
       int = setInterval(() => {
         setElapsed((prev) => {
           const next = prev + 1;
-          const nextZoneTimeLeft = (next + 1) % 300 < 120 ? 120 - ((next + 1) % 300) : (next + 1) % 300 < 240 ? 240 - ((next + 1) % 300) : 300 - ((next + 1) % 300);
+          const nextTimeInRound = next % 300;
+          const nextZoneLeft = nextTimeInRound < 120 ? 120 - nextTimeInRound : nextTimeInRound < 240 ? 240 - nextTimeInRound : 300 - nextTimeInRound;
 
-          if (nextZoneTimeLeft === 3 || nextZoneTimeLeft === 2 || nextZoneTimeLeft === 1) void emitCountdown();
-          else if (nextZoneTimeLeft === 0) {
+          if (nextZoneLeft <= 10 && nextZoneLeft > 0 && db.settings?.haptics) emitHaptic('light');
+          if (nextZoneLeft <= 3 && nextZoneLeft > 0 && beepsEnabled && audioUnlocked) void playBeep(1040, 0.05, 0.06);
+          if (nextZoneLeft === 0) {
             void emitThud();
             emitHaptic('heavy');
           }
 
           if (next >= 1500) {
             emitHaptic('heavy');
+            void emitThud();
             setIsActive(false);
             setShowSummary(true);
             return 1500;
@@ -1027,13 +1116,7 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
     }
     return () => clearInterval(int);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive]);
-
-  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
-
-  const timeInRound = elapsed % 300;
-  const currentZoneTimeLeft = timeInRound < 120 ? 120 - timeInRound : timeInRound < 240 ? 240 - timeInRound : 300 - timeInRound;
-  const currentZoneName = timeInRound < 120 ? 'Zone A' : timeInRound < 240 ? 'Zone B' : 'Zone C';
+  }, [isActive, beepsEnabled, audioUnlocked, db.settings?.haptics]);
 
   const handleAudioUnlock = async () => {
     const ok = await unlockAudio();
@@ -1078,6 +1161,12 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
     );
   }
 
+  const ringSize = 320;
+  const ringStroke = 10;
+  const ringRadius = (ringSize - ringStroke) / 2;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - zoneProgressPct / 100);
+
   return (
     <div className="flex-1 flex flex-col h-full relative overflow-hidden" style={{ backgroundColor: themeObj.bg }}>
       <AudioGateOverlay
@@ -1095,49 +1184,69 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
       />
       <BlockedAudioChip beepsEnabled={beepsEnabled} audioUnlocked={audioUnlocked} themeObj={themeObj} onClick={() => setDismissedAudioGate(false)} />
 
-      <div className="absolute top-[safe] left-0 right-0 flex flex-col items-center z-10 pointer-events-none">
-        <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40 mb-1" style={{ color: themeObj.text }}>Total Session</span>
-        <span className="text-[32px] font-[1000] tabular-nums tracking-tighter leading-none" style={{ color: themeObj.text }}>{formatTime(elapsed)}</span>
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div
+          className={`absolute inset-0 transition-all duration-300 ${phasePulse ? 'opacity-100 scale-[1.02]' : 'opacity-80 scale-100'}`}
+          style={{ background: `linear-gradient(180deg, transparent 10%, ${zoneColor}22 60%, ${zoneColor}44 100%)` }}
+        />
+        <div className="absolute left-0 right-0 bottom-0 transition-all duration-500 ease-linear" style={{ height: `${zoneProgressPct}%`, backgroundColor: zoneColor, opacity: 0.22 }} />
       </div>
 
-      <div className="absolute inset-0 flex flex-row z-0 opacity-60">
-        {['A', 'B', 'C'].map((z, idx) => {
-          const prog = z === 'A' ? (timeInRound >= 120 ? 0 : ((120 - timeInRound) / 120) * 100) : z === 'B' ? (timeInRound < 120 ? 100 : timeInRound >= 240 ? 0 : ((240 - timeInRound) / 120) * 100) : timeInRound < 240 ? 100 : ((300 - timeInRound) / 60) * 100;
-          return (
-            <div key={z} className="flex-1 h-full flex flex-col justify-end bg-black bg-opacity-20">
-              <div className="w-full transition-all duration-1000 ease-linear shadow-[0_0_60px_rgba(0,0,0,0.5)]" style={{ height: `${Math.max(0, Math.min(100, prog))}%`, backgroundColor: [themeObj.zoneA, themeObj.zoneB, themeObj.zoneC][idx] }} />
-            </div>
-          );
-        })}
-      </div>
+      <div className="px-6 pt-[safe-lg] flex items-center justify-between z-20">
+        <button
+          onClick={() => { setElapsed(0); setIsActive(false); setShowSummary(false); }}
+          className="p-2 bg-black bg-opacity-30 backdrop-blur-md rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white"
+          aria-label="Reset cardio"
+          disabled={isActive && elapsed > 0}
+          style={{ opacity: !isActive && elapsed > 0 ? 1 : 0.35 }}
+        >
+          <ResetIcon size={22} color="#FFF" />
+        </button>
 
-      <div className="px-6 pt-[safe-lg] flex justify-between items-start z-10 relative">
-        <button onClick={onCancel} className="p-2 bg-black bg-opacity-30 backdrop-blur-md rounded-full absolute right-6 outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Exit cardio"><X size={24} color="#FFF" /></button>
-        {!isActive && elapsed > 0 && (
-          <button onClick={() => { setElapsed(0); setIsActive(false); setShowSummary(false); }} className="p-2 bg-black bg-opacity-30 backdrop-blur-md rounded-full absolute left-6 outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Reset cardio"><ResetIcon size={24} color="#FFF" /></button>
-        )}
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center p-8 z-10 text-center relative mt-8">
-        <p className="text-[12px] font-black uppercase tracking-[0.2em] opacity-40 mb-2" style={{ color: themeObj.text }}>Round {Math.min(5, Math.floor(elapsed / 300) + 1)} of 5</p>
-        <div className={`text-[26vw] sm:text-[140px] font-[1000] tabular-nums tracking-tighter leading-none mb-4 transition-all duration-500 ${isActive ? 'scale-105' : 'scale-100'}`} style={{ color: themeObj.text, textShadow: '0 10px 60px rgba(0,0,0,0.6)' }}>
-          {formatTime(currentZoneTimeLeft)}
-        </div>
-        <div className="flex flex-col items-center gap-8 w-full">
-          <div className="px-12 py-5 rounded-[40px] border-4 backdrop-blur-2xl shadow-2xl transition-colors duration-500" style={{ borderColor: timeInRound < 120 ? themeObj.zoneA : timeInRound < 240 ? themeObj.zoneB : themeObj.zoneC, backgroundColor: 'rgba(0,0,0,0.4)' }}>
-            <h3 className="text-4xl font-[1000] uppercase tracking-tighter" style={{ color: '#FFF' }}>{currentZoneName}</h3>
+        <div className="text-center pointer-events-none">
+          <span className="text-[10px] font-black uppercase tracking-[0.24em] opacity-45" style={{ color: themeObj.text }}>Total Elapsed</span>
+          <div className="text-[22px] font-black tabular-nums" style={{ color: themeObj.text }}>{formatTime(elapsed)}</div>
+          <div className="w-40 h-1.5 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${totalProgressPct}%`, backgroundColor: zoneColor }} />
           </div>
-          {lastTarget && (
-            <div className="px-8 py-5 rounded-[30px] bg-black bg-opacity-60 backdrop-blur-xl border border-white border-opacity-5 shadow-2xl scale-110">
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white opacity-40 block mb-2">Last Known Pace</span>
-              <span className="text-[32px] font-black text-white leading-none">{String(lastTarget[`zone${currentZoneName.slice(-1)}`] || '—')}</span>
-            </div>
-          )}
         </div>
-        <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
+
+        <button onClick={onCancel} className="p-2 bg-black bg-opacity-30 backdrop-blur-md rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Exit cardio"><X size={24} color="#FFF" /></button>
       </div>
 
-      <div className="p-10 pb-[safe-xl] flex justify-center backdrop-blur-3xl bg-black bg-opacity-40 z-20 border-t border-white border-opacity-5">
+      <div className="flex-1 flex items-center justify-center px-4 z-20">
+        <div className="relative w-[min(86vw,360px)] h-[min(86vw,360px)]">
+          <svg viewBox={`0 0 ${ringSize} ${ringSize}`} className="absolute inset-0 -rotate-90" aria-hidden="true">
+            <circle cx={ringSize / 2} cy={ringSize / 2} r={ringRadius} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth={ringStroke} />
+            <circle
+              cx={ringSize / 2}
+              cy={ringSize / 2}
+              r={ringRadius}
+              fill="none"
+              stroke={zoneColor}
+              strokeWidth={ringStroke}
+              strokeLinecap="round"
+              strokeDasharray={ringCircumference}
+              strokeDashoffset={ringOffset}
+              style={{ transition: 'stroke-dashoffset 0.35s linear, stroke 0.2s ease' }}
+            />
+          </svg>
+
+          <div className="absolute inset-[15%] rounded-full backdrop-blur-2xl border flex flex-col items-center justify-center text-center" style={{ borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] opacity-60 text-white">Round {currentRound} of 5</p>
+            <h2 className={`text-[min(22vw,92px)] leading-none font-black tabular-nums text-white ${isFinalCountdown ? 'animate-pulse' : ''}`}>{formatTime(zoneTimeLeft)}</h2>
+            <p className="text-[20px] font-black uppercase tracking-tight" style={{ color: zoneColor }}>{currentZoneName}</p>
+            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white opacity-55">Next: {nextZone}</p>
+            {lastTarget && (
+              <p className="mt-2 text-[10px] font-bold text-white opacity-50">Last target: {String(lastTarget[`zone${zone}`] || '—')}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
+
+      <div className="p-8 pb-[safe-xl] flex flex-col items-center gap-3 backdrop-blur-2xl z-20" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
         <button
           onClick={async () => {
             await safeResumeAudio();
@@ -1149,6 +1258,7 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
         >
           {isActive ? <Pause size={44} strokeWidth={3} /> : <Play size={44} strokeWidth={3} className="ml-2" />}
         </button>
+        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white opacity-55">2:00 A • 2:00 B • 1:00 C rhythm</span>
       </div>
     </div>
   );
@@ -1159,7 +1269,7 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
   const [isActive, setIsActive] = useState(false);
   const [rounds, setRounds] = useState(0);
   const [tapped, setTapped] = useState(new Set());
-  const [isPulsing, setIsPulsing] = useState(false);
+  const [roundFlash, setRoundFlash] = useState(false);
 
   const { isSupported: wakeLockSupported } = useScreenWakeLock(true);
 
@@ -1168,8 +1278,6 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
   const [dismissedAudioGate, setDismissedAudioGate] = useState(false);
   const showAudioGate = beepsEnabled && !audioUnlocked && !dismissedAudioGate;
 
-  const emitBeep = async (...args) => { if (beepsEnabled && audioUnlocked) await playBeep(...args); };
-  const emitCountdown = async () => { if (beepsEnabled && audioUnlocked) await playCountdownTriple(); };
   const emitThud = async () => { if (beepsEnabled && audioUnlocked) await playTransitionThud(); };
   const emitHaptic = (style = 'medium') => { if (db.settings?.haptics) triggerHaptic(style); };
 
@@ -1178,7 +1286,7 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     if (isActive && elapsed > 0) {
       int = setInterval(() => {
         setElapsed((p) => {
-          if (p === 4 || p === 3 || p === 2) void emitCountdown();
+          if (p <= 3 && p > 0 && beepsEnabled && audioUnlocked) void playBeep(980, 0.05, 0.06);
           if (p <= 1) {
             emitHaptic('heavy');
             void emitThud();
@@ -1191,10 +1299,10 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     }
     return () => clearInterval(int);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, elapsed]);
+  }, [isActive, elapsed, beepsEnabled, audioUnlocked]);
 
   const toggleEx = (idx) => {
-    if (!isActive || isPulsing) return;
+    if (!isActive) return;
     const next = new Set(tapped);
     if (next.has(idx)) next.delete(idx);
     else next.add(idx);
@@ -1202,18 +1310,16 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     setTapped(next);
 
     if (next.size === 4) {
-      setIsPulsing(true);
+      setRoundFlash(true);
       setRounds((r) => r + 1);
-      emitHaptic('heavy');
-      void emitBeep(1200, 0.05, 0.1);
-
+      emitHaptic('medium');
+      if (beepsEnabled && audioUnlocked) void playBeep(1200, 0.04, 0.08);
       setTimeout(() => {
         setTapped(new Set());
-        setIsPulsing(false);
-      }, 800);
+        setRoundFlash(false);
+      }, 260);
     } else {
       emitHaptic('light');
-      void emitBeep(900, 0.03, 0.05);
     }
   };
 
@@ -1225,12 +1331,21 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     }
   };
 
+  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  const totalProgressPct = Math.max(0, Math.min(100, ((600 - elapsed) / 600) * 100));
+
   const exercises = [
-    { name: 'Dead Bug', reps: '10 / side', desc: 'Lower back glued' },
-    { name: 'RKC Plank', reps: '30 seconds', desc: 'Max glute tension' },
-    { name: 'Bird Dog', reps: '10 / side', desc: 'No hip wobble' },
-    { name: 'Side Plank', reps: '20s / side', desc: 'High hips locked' }
+    { name: 'Dead Bug', reps: '10 / side' },
+    { name: 'RKC Plank', reps: '30 sec' },
+    { name: 'Bird Dog', reps: '10 / side' },
+    { name: 'Side Plank', reps: '20 sec / side' }
   ];
+
+  const ringSize = 300;
+  const ringStroke = 8;
+  const ringRadius = (ringSize - ringStroke) / 2;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - totalProgressPct / 100);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative" style={{ backgroundColor: themeObj.bg }}>
@@ -1249,102 +1364,83 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
       />
       <BlockedAudioChip beepsEnabled={beepsEnabled} audioUnlocked={audioUnlocked} themeObj={themeObj} onClick={() => setDismissedAudioGate(false)} />
 
-      <div className="px-8 pt-[safe-lg] flex justify-between items-center z-10">
-        <div className="flex items-center gap-3">
-          <Zap size={28} color={themeObj.primary} />
-          <h1 className="text-[26px] font-[1000] tracking-tighter uppercase" style={{ color: themeObj.text }}>Stability Engine</h1>
+      <div className="px-6 pt-[safe-lg] pb-4 flex justify-between items-center z-10">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: themeObj.primary }}>Post-Cardio Core</p>
+          <h1 className="text-[28px] font-[1000] tracking-tighter uppercase" style={{ color: themeObj.text }}>Round Engine</h1>
         </div>
-        <button onClick={onCancel} className="p-3 bg-white bg-opacity-10 rounded-full outline-none focus-visible:ring-2" style={{ color: themeObj.text }} aria-label="Exit core finisher"><X size={24} /></button>
+        <button onClick={onCancel} className="p-3 rounded-full outline-none focus-visible:ring-2" style={{ color: themeObj.text, backgroundColor: themeObj.card }} aria-label="Exit core finisher"><X size={24} /></button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 z-10 relative mt-4">
-        <span className="text-[12px] font-black uppercase tracking-[0.4em] opacity-40 mb-2" style={{ color: themeObj.text }}>Time Remaining</span>
-        <span className="text-[20vw] md:text-[120px] font-[1000] tracking-tighter tabular-nums leading-none mb-4 sm:mb-8" style={{ color: themeObj.text, textShadow: '0 0 50px rgba(0,122,255,0.4)' }}>
-          {Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, '0')}
-        </span>
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="mx-auto max-w-[460px]">
+          <div className="relative mx-auto w-[min(82vw,320px)] h-[min(82vw,320px)]">
+            <svg viewBox={`0 0 ${ringSize} ${ringSize}`} className="absolute inset-0 -rotate-90" aria-hidden="true">
+              <circle cx={ringSize / 2} cy={ringSize / 2} r={ringRadius} fill="none" stroke={themeObj.border} strokeWidth={ringStroke} />
+              <circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={ringRadius}
+                fill="none"
+                stroke={themeObj.primary}
+                strokeWidth={ringStroke}
+                strokeLinecap="round"
+                strokeDasharray={ringCircumference}
+                strokeDashoffset={ringOffset}
+                style={{ transition: 'stroke-dashoffset 0.35s linear' }}
+              />
+            </svg>
 
-        <div className="relative w-full max-w-[420px] aspect-square mx-auto mt-4 sm:mt-8">
-          <div className={`grid grid-cols-2 grid-rows-2 w-full h-full gap-4 sm:gap-6 transition-all duration-500 ${isPulsing ? 'scale-[1.03] opacity-90' : 'scale-100 opacity-100'}`}>
+            <div className={`absolute inset-[20%] rounded-full border flex flex-col items-center justify-center text-center transition-transform duration-200 ${roundFlash ? 'scale-105' : 'scale-100'}`} style={{ borderColor: themeObj.border, backgroundColor: themeObj.card }}>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60" style={{ color: themeObj.text }}>Round Count</span>
+              <span className="text-[60px] font-black leading-none tabular-nums" style={{ color: themeObj.text }}>{rounds}</span>
+              <span className="text-[12px] font-black uppercase tracking-[0.16em] opacity-60" style={{ color: themeObj.textSecondary }}>{formatTime(elapsed)} remaining</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-7">
             {exercises.map((ex, idx) => {
-              const isTapped = tapped.has(idx);
+              const done = tapped.has(idx);
               return (
                 <button
-                  key={idx}
-                  aria-label={`Complete ${ex.name}`}
+                  key={ex.name}
                   onClick={() => toggleEx(idx)}
-                  className={`flex flex-col items-center justify-center p-4 transition-all duration-500 outline-none focus-visible:ring-4 rounded-3xl relative overflow-hidden border ${isTapped ? 'scale-105 z-10' : 'scale-100 z-0 active:scale-95 hover:border-white hover:border-opacity-5'}`}
-                  style={{
-                    backgroundColor: isTapped ? (db.settings.theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') : 'transparent',
-                    borderColor: isTapped ? `${themeObj.seafoam}40` : 'transparent',
-                    boxShadow: isTapped ? `0 20px 40px -10px ${themeObj.seafoam}30` : 'none'
-                  }}
+                  aria-label={`Mark ${ex.name} complete`}
+                  className="rounded-2xl border p-4 text-left outline-none focus-visible:ring-4 transition-transform active:scale-[0.98]"
+                  style={{ borderColor: done ? themeObj.success : themeObj.border, backgroundColor: done ? `${themeObj.success}22` : themeObj.card }}
                 >
-                  <div className={`absolute inset-0 transition-opacity duration-700 pointer-events-none ${isTapped ? 'opacity-100' : 'opacity-0'}`} style={{ background: `radial-gradient(circle at center, ${themeObj.seafoam}30 0%, transparent 70%)` }} />
-
-                  <div
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-4 mb-3 transition-all duration-500 shadow-lg relative z-10"
-                    style={{
-                      borderColor: isTapped ? themeObj.seafoam : themeObj.border,
-                      backgroundColor: isTapped ? themeObj.seafoam : (db.settings.theme === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
-                      boxShadow: isTapped ? `0 0 25px ${themeObj.seafoam}80` : 'none'
-                    }}
-                  >
-                    {isTapped ? (
-                      <Check size={28} strokeWidth={4} color={db.settings.theme === 'dark' ? '#000' : '#FFF'} className="transition-transform duration-300" />
-                    ) : (
-                      <span className="text-[10px] md:text-[12px] font-black uppercase tracking-widest text-center px-2" style={{ color: themeObj.text }}>TAP</span>
-                    )}
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-[15px] font-black uppercase tracking-tight" style={{ color: themeObj.text }}>{ex.name}</h3>
+                    {done && <Check size={18} strokeWidth={3} color={themeObj.success} />}
                   </div>
-
-                  <h4 className="text-[15px] sm:text-[18px] font-black tracking-tighter uppercase leading-tight text-center relative z-10 transition-colors duration-500" style={{ color: isTapped ? themeObj.seafoam : themeObj.text }}>
-                    {ex.name}
-                  </h4>
-                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-center mt-1 relative z-10 transition-opacity duration-500" style={{ color: themeObj.text, opacity: isTapped ? 0.8 : 0.4 }}>
-                    {ex.reps}
-                  </span>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-60 mt-1" style={{ color: themeObj.textSecondary }}>{ex.reps}</p>
                 </button>
               );
             })}
           </div>
 
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-20">
-            <div className={`relative pointer-events-auto group transition-all duration-500 ${isPulsing ? 'scale-110 sm:scale-110' : 'scale-[0.85] sm:scale-100'}`}>
-              <div className="absolute inset-0 rounded-full blur-3xl scale-150 transition-all duration-500" style={{ backgroundColor: isPulsing ? themeObj.seafoam : (isActive ? themeObj.primary : 'transparent'), opacity: isPulsing ? 0.7 : isActive ? 0.3 : 0 }} />
-              <div
-                className="w-[140px] h-[140px] sm:w-[160px] sm:h-[160px] rounded-full shadow-[0_40px_80px_-20px_rgba(0,102,204,0.6)] flex flex-col items-center justify-center border-[8px] relative z-10 overflow-hidden transition-all duration-500"
-                style={{ backgroundColor: isPulsing ? themeObj.seafoam : themeObj.primary, borderColor: isPulsing ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.1)', color: isPulsing ? '#000' : '#FFF' }}
-              >
-                {!isActive ? (
-                  <button aria-label="Start Core Timer" onClick={async () => { await safeResumeAudio(); setIsActive(true); }} className="text-3xl sm:text-4xl font-black tracking-tighter outline-none focus-visible:ring-4 rounded-full w-full h-full active:bg-blue-700 transition-colors">START</button>
-                ) : (
-                  <div className="flex flex-col items-center justify-center w-full h-full pointer-events-none">
-                    <span className="text-[11px] sm:text-[12px] font-black uppercase tracking-[0.4em] opacity-50 mb-1">Rounds</span>
-                    <span className="text-5xl sm:text-7xl font-black tracking-tighter leading-none">{rounds}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
         </div>
-        {isActive && <p className="mt-8 text-[11px] font-black uppercase tracking-[0.5em] opacity-30 animate-pulse text-center" style={{ color: themeObj.text }}>Check all 4 circles</p>}
-        <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
       </div>
 
-      {rounds > 0 && !isActive && (
-        <div className="p-10 pb-[safe-xl] z-20">
-          <Button onClick={() => onComplete({ kind: 'CORE', core: { rounds } })} themeObj={themeObj} className="py-6 shadow-2xl tracking-[0.3em] uppercase text-sm font-[1000]">Shut Down Engine</Button>
-        </div>
-      )}
+      <div className="p-6 pb-[safe-xl] border-t" style={{ borderColor: themeObj.border, backgroundColor: themeObj.card }}>
+        {isActive ? (
+          <Button onClick={() => setIsActive(false)} themeObj={themeObj} variant="secondary" className="py-5 uppercase tracking-[0.22em]">Pause Engine</Button>
+        ) : (
+          <Button onClick={async () => { await safeResumeAudio(); setIsActive(true); }} themeObj={themeObj} className="py-5 uppercase tracking-[0.22em]">
+            {elapsed === 600 ? 'Start 10:00 Block' : elapsed > 0 ? 'Resume Block' : 'Block Complete'}
+          </Button>
+        )}
 
-      {isActive && (
-        <div className="p-8 pb-[safe-xl] z-20 flex justify-center">
-          <button onClick={() => setIsActive(false)} className="text-[12px] font-black uppercase tracking-[0.4em] opacity-30 hover:opacity-100 transition-opacity outline-none focus-visible:ring-2 px-6 py-3 rounded-full" style={{ color: themeObj.text, backgroundColor: themeObj.card }}>Pause Engine</button>
-        </div>
-      )}
+        {!isActive && (rounds > 0 || elapsed === 0) && (
+          <Button onClick={() => onComplete({ kind: 'CORE', core: { rounds } })} themeObj={themeObj} variant="secondary" className="mt-3 py-4 uppercase tracking-[0.2em]">
+            Save Core Session
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
-
 function HistoryScreen({ db, onBack, themeObj }) {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden" style={{ backgroundColor: themeObj.bg }}>
