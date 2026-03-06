@@ -822,13 +822,24 @@ function SwipeableExerciseRow({
 }
 
 function RestFlipDigits({ value, label, isUrgent, themeObj }) {
+  const [animateTick, setAnimateTick] = useState(false);
+  const prevValueRef = useRef(value);
+
+  useEffect(() => {
+    if (prevValueRef.current === value) return;
+    prevValueRef.current = value;
+    setAnimateTick(true);
+    const t = setTimeout(() => setAnimateTick(false), 280);
+    return () => clearTimeout(t);
+  }, [value]);
+
   return (
     <div className="flex flex-col items-center">
       <div
         className="w-[120px] sm:w-[150px] h-[140px] sm:h-[170px] rounded-[18px] border flex items-center justify-center bg-black"
         style={{ borderColor: isUrgent ? 'rgba(255,209,102,0.6)' : 'rgba(255,255,255,0.16)' }}
       >
-        <span key={`${label}-${value}`} className="rest-flip-digit text-[80px] sm:text-[106px] font-black leading-none tabular-nums" style={{ color: isUrgent ? '#FFD166' : '#F8FAFC' }}>
+        <span className={`rest-flip-digit ${animateTick ? 'rest-flip-digit--animate' : ''} text-[80px] sm:text-[106px] font-black leading-none tabular-nums`} style={{ color: isUrgent ? '#FFD166' : '#F8FAFC' }}>
           {value}
         </span>
       </div>
@@ -923,6 +934,12 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
     : currentCycleFloor <= 3
       ? 'Fail 2–3 = drop load'
       : 'Fail 4–5 = keep load';
+  const skipRestNow = () => {
+    setRestTime(0);
+    setIsResting(false);
+    emitHaptic('medium');
+    void emitThud();
+  };
 
   const handleAudioUnlock = async () => {
     const ok = await unlockAudio();
@@ -960,6 +977,14 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
             <RestFlipDigits value={restSeconds} label="SEC" isUrgent={restUrgent} themeObj={themeObj} />
           </div>
           <p className="mt-8 text-[12px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(255,255,255,0.68)' }}>{restHint}</p>
+          <button
+            onClick={skipRestNow}
+            className="mt-7 px-8 py-3 rounded-full border text-[12px] font-black uppercase tracking-[0.2em] active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white"
+            style={{ borderColor: 'rgba(255,255,255,0.45)', color: 'rgba(255,255,255,0.95)', backgroundColor: 'rgba(255,255,255,0.06)' }}
+            aria-label="Skip rest timer"
+          >
+            Skip Rest
+          </button>
         </div>
       )}
 
