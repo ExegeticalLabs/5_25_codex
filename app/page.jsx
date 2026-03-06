@@ -1122,7 +1122,6 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
   const zoneElapsed = zone === 'A' ? timeInRound : zone === 'B' ? timeInRound - 120 : timeInRound - 240;
   const zoneTimeLeft = zoneDuration - zoneElapsed;
   const zoneProgressPct = Math.max(0, Math.min(100, (zoneElapsed / zoneDuration) * 100));
-  const totalProgressPct = Math.max(0, Math.min(100, (elapsed / 1500) * 100));
   const zoneColor = zone === 'A' ? themeObj.zoneA : zone === 'B' ? themeObj.zoneB : themeObj.zoneC;
   const nextZone = zone === 'A' ? 'Zone B' : zone === 'B' ? 'Zone C' : currentRound === 5 ? 'Complete' : 'Zone A';
   const isFinalCountdown = zoneTimeLeft <= 10 && zoneTimeLeft > 0;
@@ -1257,14 +1256,6 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
         >
           <ResetIcon size={20} />
         </button>
-
-        <div className="text-center pointer-events-none">
-          <span className="text-[10px] font-black uppercase tracking-[0.24em] opacity-55 text-white">Total Elapsed</span>
-          <div className="text-[22px] font-black tabular-nums text-white">{formatTime(elapsed)}</div>
-          <div className="w-40 h-1.5 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${totalProgressPct}%`, backgroundColor: zoneColor }} />
-          </div>
-        </div>
 
         <button onClick={onCancel} className="h-11 w-11 border rounded-xl flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ borderColor: 'rgba(255,255,255,0.26)', color: '#FFF', backgroundColor: 'rgba(0,0,0,0.28)' }} aria-label="Exit cardio"><X size={22} /></button>
       </div>
