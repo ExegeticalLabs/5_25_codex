@@ -822,26 +822,53 @@ function SwipeableExerciseRow({
 }
 
 function RestFlipDigits({ value, label, isUrgent, themeObj }) {
-  const [animateTick, setAnimateTick] = useState(false);
-  const prevValueRef = useRef(value);
+  const chars = useMemo(() => String(value).split(''), [value]);
+  const [changedFlags, setChangedFlags] = useState(() => chars.map(() => false));
+  const prevCharsRef = useRef(chars);
 
   useEffect(() => {
-    if (prevValueRef.current === value) return;
-    prevValueRef.current = value;
-    setAnimateTick(true);
-    const t = setTimeout(() => setAnimateTick(false), 280);
+    const prev = prevCharsRef.current;
+    const next = chars;
+    const nextFlags = next.map((char, idx) => prev[idx] !== char);
+    prevCharsRef.current = next;
+
+    if (!nextFlags.some(Boolean)) {
+      setChangedFlags(next.map(() => false));
+      return;
+    }
+
+    setChangedFlags(nextFlags);
+    const t = setTimeout(() => setChangedFlags(next.map(() => false)), 280);
     return () => clearTimeout(t);
-  }, [value]);
+  }, [chars]);
 
   return (
     <div className="flex flex-col items-center">
       <div
-        className="w-[120px] sm:w-[150px] h-[140px] sm:h-[170px] rounded-[18px] border flex items-center justify-center bg-black"
+        className="relative overflow-hidden w-[120px] sm:w-[150px] h-[140px] sm:h-[170px] rounded-[18px] border flex items-center justify-center bg-black"
         style={{ borderColor: isUrgent ? 'rgba(255,209,102,0.6)' : 'rgba(255,255,255,0.16)' }}
       >
-        <span className={`rest-flip-digit ${animateTick ? 'rest-flip-digit--animate' : ''} text-[80px] sm:text-[106px] font-black leading-none tabular-nums`} style={{ color: isUrgent ? '#FFD166' : '#F8FAFC' }}>
-          {value}
+        <span className="flex items-center justify-center gap-[2px] sm:gap-[3px] leading-none tabular-nums">
+          {chars.map((char, idx) => (
+            <span
+              key={idx}
+              className={`rest-flip-digit ${changedFlags[idx] ? 'rest-flip-digit--animate' : ''} inline-block text-center min-w-[0.56ch] text-[80px] sm:text-[106px] font-black leading-none`}
+              style={{ color: isUrgent ? '#FFD166' : '#F8FAFC' }}
+            >
+              {char}
+            </span>
+          ))}
         </span>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2 right-2 top-1/2 -translate-y-1/2 h-px rounded-full"
+          style={{
+            backgroundColor: 'rgba(2,3,4,0.72)',
+            boxShadow: isUrgent
+              ? '0 -1px 0 rgba(255,209,102,0.30), 0 1px 0 rgba(255,209,102,0.10)'
+              : '0 -1px 0 rgba(255,255,255,0.24), 0 1px 0 rgba(255,255,255,0.08)'
+          }}
+        />
       </div>
       <span className="mt-2 text-[10px] font-black uppercase tracking-[0.24em]" style={{ color: isUrgent ? '#FFD166' : 'rgba(255,255,255,0.55)' }}>{label}</span>
     </div>
