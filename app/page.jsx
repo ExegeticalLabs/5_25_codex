@@ -39,9 +39,10 @@ import {
 // CONSTANTS & UTILITIES
 // =====================================================
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DB_STORAGE_KEY = 'myobound_db';
 const AUDIO_UNLOCK_KEY = 'myobound_audioUnlocked';
+const CORE_COMBO_IDS = ['combo1', 'combo2', 'combo3', 'combo4'];
 
 const CATEGORIES = {
   UPPER: [
@@ -77,26 +78,38 @@ const generateBlockSlots = () => {
 
 const slugify = (s = '') => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
+const createDefaultCoreProgram = () => ({
+  mode: 'auto',
+  selectedComboId: null,
+  customByCombo: {
+    combo1: {},
+    combo2: {},
+    combo3: {},
+    combo4: {}
+  }
+});
+
 const createDefaultState = () => ({
   dbVersion: DB_VERSION,
   onboarded: false,
   officialStarted: false,
+  pendingBlockReview: false,
   currentBlock: 1,
   currentSlotIndex: 0,
   plan: { upper: [], lower: [] },
   usedInLastBlock: [],
   slots: generateBlockSlots(),
   history: [],
+  coreProgram: createDefaultCoreProgram(),
   settings: {
     theme: 'dark',
     haptics: true,
     beeps: true,
-    metronome: false,
     audioUnlocked: false
   }
 });
 
-const mergeLoadedState = (parsed, audioUnlockedFlag = false) => {
+const normalizeDb = (parsed, audioUnlockedFlag = false) => {
   const base = createDefaultState();
 
   if (!parsed || typeof parsed !== 'object') {
@@ -109,19 +122,50 @@ const mergeLoadedState = (parsed, audioUnlockedFlag = false) => {
     };
   }
 
+  const parsedPlan = parsed.plan && typeof parsed.plan === 'object' ? parsed.plan : {};
+  const parsedSettings = parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : {};
+  const parsedCoreProgram = parsed.coreProgram && typeof parsed.coreProgram === 'object' ? parsed.coreProgram : {};
+  const parsedCustomByCombo = parsedCoreProgram.customByCombo && typeof parsedCoreProgram.customByCombo === 'object' ? parsedCoreProgram.customByCombo : {};
+  const baseCoreProgram = createDefaultCoreProgram();
+
   return {
     ...base,
     ...parsed,
     dbVersion: DB_VERSION,
-    plan: { ...base.plan, ...(parsed.plan || {}) },
+    onboarded: Boolean(parsed.onboarded),
+    officialStarted: Boolean(parsed.officialStarted),
+    pendingBlockReview: Boolean(parsed.pendingBlockReview),
+    currentBlock: Number.isInteger(parsed.currentBlock) && parsed.currentBlock > 0 ? parsed.currentBlock : base.currentBlock,
+    currentSlotIndex: Number.isInteger(parsed.currentSlotIndex) && parsed.currentSlotIndex >= 0 ? parsed.currentSlotIndex : base.currentSlotIndex,
+    plan: {
+      upper: Array.isArray(parsedPlan.upper) ? parsedPlan.upper : base.plan.upper,
+      lower: Array.isArray(parsedPlan.lower) ? parsedPlan.lower : base.plan.lower
+    },
+    usedInLastBlock: Array.isArray(parsed.usedInLastBlock) ? parsed.usedInLastBlock : base.usedInLastBlock,
+    coreProgram: {
+      ...baseCoreProgram,
+      ...parsedCoreProgram,
+      mode: parsedCoreProgram.mode === 'manual' ? 'manual' : 'auto',
+      selectedComboId: CORE_COMBO_IDS.includes(parsedCoreProgram.selectedComboId) ? parsedCoreProgram.selectedComboId : null,
+      customByCombo: CORE_COMBO_IDS.reduce((acc, comboId) => {
+        const maybeOverrides = parsedCustomByCombo[comboId];
+        acc[comboId] = maybeOverrides && typeof maybeOverrides === 'object' && !Array.isArray(maybeOverrides) ? maybeOverrides : {};
+        return acc;
+      }, {})
+    },
     settings: {
       ...base.settings,
-      ...(parsed.settings || {}),
-      audioUnlocked: Boolean((parsed.settings || {}).audioUnlocked || audioUnlockedFlag)
+      ...parsedSettings,
+      audioUnlocked: Boolean(parsedSettings.audioUnlocked || audioUnlockedFlag)
     },
     slots: Array.isArray(parsed.slots) && parsed.slots.length ? parsed.slots : base.slots,
     history: Array.isArray(parsed.history) ? parsed.history : base.history
   };
+};
+
+const getInitialScreen = (state) => {
+  if (state?.pendingBlockReview) return 'BLOCK_REVIEW';
+  return state?.onboarded ? 'HUB' : 'WELCOME';
 };
 
 const getAdviceForExercise = (pastLogs) => {
@@ -1527,7 +1571,7 @@ function HistoryScreen({ db, onBack, themeObj }) {
   );
 }
 
-function SettingsScreen({ db, setDb, onBack, themeObj }) {
+function SettingsScreen({ db, setDb, onBack, onImportBackup, themeObj }) {
   const toggleSetting = (key) => setDb((prev) => ({ ...prev, settings: { ...prev.settings, [key]: !prev.settings[key] } }));
 
   const handleExport = async () => {
@@ -1538,12 +1582,16 @@ function SettingsScreen({ db, setDb, onBack, themeObj }) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target.result);
         if (parsed.history && parsed.plan) {
           if (typeof window !== 'undefined' && window.confirm('Overwrite current data with imported backup?')) {
-            setDb(parsed);
+            if (onImportBackup) {
+              await onImportBackup(parsed);
+            } else {
+              setDb(normalizeDb(parsed, db.settings?.audioUnlocked));
+            }
           }
         } else {
           alert('Invalid backup file.');
@@ -1633,11 +1681,11 @@ export default function App() {
     const hydrate = async () => {
       const saved = await readJSON(DB_STORAGE_KEY, null);
       const audioUnlockedFlag = await readBool(AUDIO_UNLOCK_KEY, false);
-      const merged = mergeLoadedState(saved, audioUnlockedFlag);
+      const merged = normalizeDb(saved, audioUnlockedFlag);
 
       if (cancelled) return;
       setDb(merged);
-      setScreen(merged.onboarded ? 'HUB' : 'WELCOME');
+      setScreen(getInitialScreen(merged));
       setHydrated(true);
     };
 
@@ -1659,6 +1707,14 @@ export default function App() {
   }, [db, hydrated]);
 
   const themeObj = db.settings.theme === 'dark' ? COLORS.dark : COLORS.light;
+
+  const handleImportBackup = async (parsed) => {
+    const audioUnlockedFlag = await readBool(AUDIO_UNLOCK_KEY, false);
+    const normalized = normalizeDb(parsed, audioUnlockedFlag);
+    setDb(normalized);
+    setPendingCardio(null);
+    setScreen(getInitialScreen(normalized));
+  };
 
   const handleComplete = (data, isManual = false) => {
     const entry = {
@@ -1720,7 +1776,16 @@ export default function App() {
       case 'HISTORY':
         return <HistoryScreen db={db} onBack={() => setScreen('HUB')} themeObj={themeObj} />;
       case 'SETTINGS':
-        return <SettingsScreen db={db} setDb={setDb} onBack={() => setScreen('HUB')} themeObj={themeObj} />;
+        return <SettingsScreen db={db} setDb={setDb} onBack={() => setScreen('HUB')} onImportBackup={handleImportBackup} themeObj={themeObj} />;
+      case 'BLOCK_REVIEW':
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center" style={{ backgroundColor: themeObj.bg, color: themeObj.text }}>
+            <Calendar size={64} className="mb-6 opacity-30" />
+            <h1 className="text-4xl font-black mb-4 uppercase leading-tight">Block Review</h1>
+            <p className="text-lg opacity-60 font-medium mb-10 leading-relaxed">Next-block guided review is ready for implementation in the next phase.</p>
+            <Button onClick={() => setScreen('HUB')} themeObj={themeObj}>Return to Hub</Button>
+          </div>
+        );
       case 'OFF':
         return (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center" style={{ backgroundColor: themeObj.bg, color: themeObj.text }}>
