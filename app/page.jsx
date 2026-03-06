@@ -1322,18 +1322,51 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
 
       <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
 
-      <div className="px-6 pt-3 pb-[safe-xl] flex flex-col items-center gap-3 z-20" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+      <div className="px-6 pt-3 pb-[safe-xl] flex flex-col items-center gap-3 z-20" style={{ backgroundColor: 'rgba(0,0,0,0.28)' }}>
         <button
           onClick={async () => {
             await safeResumeAudio();
             setIsActive((v) => !v);
           }}
-          className="w-full max-w-[380px] h-16 rounded-2xl border flex items-center justify-center gap-2 shadow-2xl transition-transform active:scale-[0.98] outline-none focus-visible:ring-4 focus-visible:ring-white"
-          style={{ backgroundColor: themeObj.primary, color: '#FFF' }}
+          className="w-full max-w-[420px] h-[74px] rounded-[22px] border flex items-center justify-between px-4 shadow-2xl transition-transform active:scale-[0.98] outline-none focus-visible:ring-4 focus-visible:ring-white"
+          style={{
+            background: 'linear-gradient(180deg, rgba(22,26,34,0.92) 0%, rgba(8,10,14,0.95) 100%)',
+            borderColor: isActive ? `${zoneColor}BB` : 'rgba(255,255,255,0.24)',
+            boxShadow: isActive
+              ? `0 0 0 1px ${zoneColor}33 inset, 0 14px 34px rgba(0,0,0,0.45)`
+              : '0 14px 34px rgba(0,0,0,0.45)',
+            color: '#FFF'
+          }}
           aria-label={isActive ? 'Pause cardio' : 'Start cardio'}
         >
-          {isActive ? <Pause size={24} strokeWidth={3} /> : <Play size={24} strokeWidth={3} className="ml-1" />}
-          <span className="text-[14px] font-black uppercase tracking-[0.16em]">{isActive ? 'Pause' : 'Start'}</span>
+          <div className="flex items-center gap-3">
+            <span
+              className="h-11 w-11 rounded-full border flex items-center justify-center"
+              style={{
+                borderColor: isActive ? `${zoneColor}CC` : 'rgba(255,255,255,0.28)',
+                backgroundColor: isActive ? `${zoneColor}22` : 'rgba(255,255,255,0.06)',
+                color: isActive ? zoneColor : '#F8FAFC'
+              }}
+            >
+              {isActive ? <Pause size={20} strokeWidth={3.2} /> : <Play size={20} strokeWidth={3.2} className="ml-0.5" />}
+            </span>
+            <div className="flex flex-col items-start">
+              <span className="text-[15px] font-black uppercase tracking-[0.16em]">{isActive ? 'Pause' : 'Start'}</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] opacity-55">
+                {isActive ? 'Interval Running' : 'Ready To Engage'}
+              </span>
+            </div>
+          </div>
+          <span
+            className="text-[11px] font-black uppercase tracking-[0.16em] rounded-full px-3 py-1 border"
+            style={{
+              borderColor: isActive ? `${zoneColor}80` : 'rgba(255,255,255,0.2)',
+              color: isActive ? zoneColor : 'rgba(255,255,255,0.68)',
+              backgroundColor: 'rgba(255,255,255,0.04)'
+            }}
+          >
+            {isActive ? 'Live' : 'Standby'}
+          </span>
         </button>
         <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white opacity-55">2:00 A • 2:00 B • 1:00 C rhythm</span>
       </div>
