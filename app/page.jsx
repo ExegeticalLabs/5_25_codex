@@ -1213,14 +1213,8 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
     );
   }
 
-  const ringSize = 320;
-  const ringStroke = 10;
-  const ringRadius = (ringSize - ringStroke) / 2;
-  const ringCircumference = 2 * Math.PI * ringRadius;
-  const ringOffset = ringCircumference * (1 - zoneProgressPct / 100);
-
   return (
-    <div className="flex-1 flex flex-col h-full relative overflow-hidden" style={{ backgroundColor: themeObj.bg }}>
+    <div className="flex-1 flex flex-col h-full relative overflow-hidden" style={{ backgroundColor: '#04070B' }}>
       <AudioGateOverlay
         visible={showAudioGate}
         themeObj={themeObj}
@@ -1236,79 +1230,69 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
       />
       <BlockedAudioChip beepsEnabled={beepsEnabled} audioUnlocked={audioUnlocked} themeObj={themeObj} onClick={() => setDismissedAudioGate(false)} />
 
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
         <div
-          className={`absolute inset-0 transition-all duration-300 ${phasePulse ? 'opacity-100 scale-[1.02]' : 'opacity-80 scale-100'}`}
-          style={{ background: `linear-gradient(180deg, transparent 10%, ${zoneColor}22 60%, ${zoneColor}44 100%)` }}
+          className={`absolute inset-0 transition-all duration-300 ${phasePulse ? 'opacity-100' : 'opacity-90'}`}
+          style={{ backgroundColor: zoneColor, opacity: phasePulse ? 0.26 : 0.20 }}
         />
-        <div className="absolute left-0 right-0 bottom-0 transition-all duration-500 ease-linear" style={{ height: `${zoneProgressPct}%`, backgroundColor: zoneColor, opacity: 0.22 }} />
+        <div
+          className="absolute left-0 right-0 bottom-0 transition-all duration-700 ease-linear"
+          style={{ height: `${zoneProgressPct}%`, backgroundColor: zoneColor, opacity: 0.86 }}
+        />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.48) 48%, rgba(0,0,0,0.26) 100%)' }} />
       </div>
 
       <div className="px-6 pt-[safe-lg] flex items-center justify-between z-20">
         <button
           onClick={() => { setElapsed(0); setIsActive(false); setShowSummary(false); }}
-          className="p-2 bg-black bg-opacity-30 backdrop-blur-md rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="h-11 px-4 border rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-white"
           aria-label="Reset cardio"
           disabled={isActive && elapsed > 0}
-          style={{ opacity: !isActive && elapsed > 0 ? 1 : 0.35 }}
+          style={{
+            borderColor: 'rgba(255,255,255,0.26)',
+            color: '#FFF',
+            backgroundColor: 'rgba(0,0,0,0.28)',
+            opacity: !isActive && elapsed > 0 ? 1 : 0.35
+          }}
         >
-          <ResetIcon size={22} color="#FFF" />
+          <ResetIcon size={20} />
         </button>
 
         <div className="text-center pointer-events-none">
-          <span className="text-[10px] font-black uppercase tracking-[0.24em] opacity-45" style={{ color: themeObj.text }}>Total Elapsed</span>
-          <div className="text-[22px] font-black tabular-nums" style={{ color: themeObj.text }}>{formatTime(elapsed)}</div>
+          <span className="text-[10px] font-black uppercase tracking-[0.24em] opacity-55 text-white">Total Elapsed</span>
+          <div className="text-[22px] font-black tabular-nums text-white">{formatTime(elapsed)}</div>
           <div className="w-40 h-1.5 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${totalProgressPct}%`, backgroundColor: zoneColor }} />
           </div>
         </div>
 
-        <button onClick={onCancel} className="p-2 bg-black bg-opacity-30 backdrop-blur-md rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Exit cardio"><X size={24} color="#FFF" /></button>
+        <button onClick={onCancel} className="h-11 w-11 border rounded-xl flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ borderColor: 'rgba(255,255,255,0.26)', color: '#FFF', backgroundColor: 'rgba(0,0,0,0.28)' }} aria-label="Exit cardio"><X size={22} /></button>
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-4 z-20">
-        <div className="relative w-[min(86vw,360px)] h-[min(86vw,360px)]">
-          <svg viewBox={`0 0 ${ringSize} ${ringSize}`} className="absolute inset-0 -rotate-90" aria-hidden="true">
-            <circle cx={ringSize / 2} cy={ringSize / 2} r={ringRadius} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth={ringStroke} />
-            <circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={ringRadius}
-              fill="none"
-              stroke={zoneColor}
-              strokeWidth={ringStroke}
-              strokeLinecap="round"
-              strokeDasharray={ringCircumference}
-              strokeDashoffset={ringOffset}
-              style={{ transition: 'stroke-dashoffset 0.35s linear, stroke 0.2s ease' }}
-            />
-          </svg>
-
-          <div className="absolute inset-[15%] rounded-full backdrop-blur-2xl border flex flex-col items-center justify-center text-center" style={{ borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] opacity-60 text-white">Round {currentRound} of 5</p>
-            <h2 className={`text-[min(22vw,92px)] leading-none font-black tabular-nums text-white ${isFinalCountdown ? 'animate-pulse' : ''}`}>{formatTime(zoneTimeLeft)}</h2>
-            <p className="text-[20px] font-black uppercase tracking-tight" style={{ color: zoneColor }}>{currentZoneName}</p>
-            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white opacity-55">Next: {nextZone}</p>
-            {lastTarget && (
-              <p className="mt-2 text-[10px] font-bold text-white opacity-50">Last target: {String(lastTarget[`zone${zone}`] || '—')}</p>
-            )}
-          </div>
-        </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-6 z-20 text-center">
+        <p className="text-[12px] font-black uppercase tracking-[0.26em] text-white opacity-60">Round {currentRound} of 5</p>
+        <h2 className={`mt-2 text-[min(34vw,170px)] leading-none font-black tabular-nums text-white tracking-tight ${isFinalCountdown ? 'animate-pulse' : ''}`}>{formatTime(zoneTimeLeft)}</h2>
+        <p className="mt-3 text-[34px] font-black uppercase tracking-tight" style={{ color: zoneColor }}>{currentZoneName}</p>
+        <p className="mt-1 text-[11px] font-black uppercase tracking-[0.2em] text-white opacity-60">Next: {nextZone}</p>
+        {lastTarget && (
+          <p className="mt-4 text-[11px] font-bold text-white opacity-55">Last target: {String(lastTarget[`zone${zone}`] || '—')}</p>
+        )}
       </div>
 
       <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
 
-      <div className="p-8 pb-[safe-xl] flex flex-col items-center gap-3 backdrop-blur-2xl z-20" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+      <div className="px-6 pt-3 pb-[safe-xl] flex flex-col items-center gap-3 z-20" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
         <button
           onClick={async () => {
             await safeResumeAudio();
             setIsActive((v) => !v);
           }}
-          className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-transform active:scale-90 outline-none focus-visible:ring-4 focus-visible:ring-white"
+          className="w-full max-w-[380px] h-16 rounded-2xl border flex items-center justify-center gap-2 shadow-2xl transition-transform active:scale-[0.98] outline-none focus-visible:ring-4 focus-visible:ring-white"
           style={{ backgroundColor: themeObj.primary, color: '#FFF' }}
           aria-label={isActive ? 'Pause cardio' : 'Start cardio'}
         >
-          {isActive ? <Pause size={44} strokeWidth={3} /> : <Play size={44} strokeWidth={3} className="ml-2" />}
+          {isActive ? <Pause size={24} strokeWidth={3} /> : <Play size={24} strokeWidth={3} className="ml-1" />}
+          <span className="text-[14px] font-black uppercase tracking-[0.16em]">{isActive ? 'Pause' : 'Start'}</span>
         </button>
         <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white opacity-55">2:00 A • 2:00 B • 1:00 C rhythm</span>
       </div>
