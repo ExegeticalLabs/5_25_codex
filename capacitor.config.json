@@ -1,0 +1,11 @@
+{
+  "appId": "com.aaronknudson.myobound",
+  "appName": "MyoBound",
+  "webDir": "out",
+  "ios": {
+    "minVersion": "16.0"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
