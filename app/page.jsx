@@ -609,68 +609,202 @@ function SetupWizard({ db, setDb, onComplete, themeObj }) {
 
 function HubScreen({ db, setDb, onNavigate, themeObj }) {
   const currentSlot = db.slots[db.currentSlotIndex] ?? { type: 'UPPER', week: 1, day: 1 };
+  const isDarkTheme = db.settings.theme === 'dark';
   const toggleTheme = () => setDb((prev) => ({ ...prev, settings: { ...prev.settings, theme: prev.settings.theme === 'dark' ? 'light' : 'dark' } }));
-  const getSlotIcon = (type) => {
-    if (type === 'UPPER' || type === 'LOWER') return <Dumbbell size={28} />;
-    if (type === 'CARDIO') return <Activity size={28} />;
-    return <Zap size={28} />;
+  const slotType = currentSlot.type || 'UPPER';
+  const clampPct = (n) => Math.max(0, Math.min(100, Math.round(n)));
+  const blockHistory = (db.history || []).filter((h) => h.official && h.block === db.currentBlock);
+  const completedDays = blockHistory.length;
+  const officialProgressPct = clampPct((db.currentSlotIndex / 42) * 100);
+  const upperPlanCount = (db.plan.upper || []).filter(Boolean).length;
+  const lowerPlanCount = (db.plan.lower || []).filter(Boolean).length;
+  const cardioEntries = blockHistory.filter((h) => h.data?.kind === 'CARDIO+CORE' || h.data?.kind === 'CARDIO');
+  const coreRoundValues = blockHistory
+    .map((h) => Number(h.data?.core?.rounds))
+    .filter((v) => Number.isFinite(v) && v >= 0);
+  const strengthAvgMinsFor = (lane, fallback) => {
+    const entries = blockHistory.filter((h) => h.data?.kind === 'STRENGTH' && h.data?.slotType === lane);
+    if (!entries.length) return fallback;
+    const totalSec = entries.reduce((sum, h) => sum + Number(h.data?.elapsed || 0), 0);
+    return Math.max(1, Math.round(totalSec / entries.length / 60));
   };
+  const upperAvgMins = strengthAvgMinsFor('UPPER', 42);
+  const lowerAvgMins = strengthAvgMinsFor('LOWER', 44);
+  const cardioAvgMins = cardioEntries.length
+    ? Math.max(1, Math.round(cardioEntries.reduce((sum, h) => sum + Number(h.data?.cardio?.elapsed || 0), 0) / cardioEntries.length / 60))
+    : 25;
 
-  const officialProgressPct = Math.max(0, Math.min(100, Math.round((db.currentSlotIndex / 42) * 100)));
+  const activeConfig = {
+    UPPER: { title: 'Upper Session', durationMin: upperAvgMins, route: 'STRENGTH', icon: Dumbbell, accent: themeObj.primary },
+    LOWER: { title: 'Lower Session', durationMin: lowerAvgMins, route: 'STRENGTH', icon: Dumbbell, accent: themeObj.primary },
+    CARDIO: { title: 'Cardio + Stability Session', durationMin: cardioAvgMins, route: 'CARDIO', icon: Activity, accent: '#F6B73C' },
+    OFF: { title: 'Recovery Day', durationMin: 20, route: 'OFF', icon: RotateCcw, accent: themeObj.textSecondary }
+  }[slotType] || { title: 'Training Session', durationMin: 35, route: 'STRENGTH', icon: Dumbbell, accent: themeObj.primary };
+  const ActiveIcon = activeConfig.icon;
+  const activeRoute = db.officialStarted ? activeConfig.route : 'STRENGTH_UPPER';
+
+  const moduleCards = [
+    {
+      id: 'upper',
+      icon: Dumbbell,
+      accent: themeObj.primary,
+      kicker: 'Upper',
+      title: 'Upper Body',
+      subtitle: `${upperPlanCount || 0} movements ready`,
+      detail: 'Press, pull, shoulders, and arms.',
+      action: 'Open Upper Session',
+      onClick: () => onNavigate('STRENGTH_UPPER')
+    },
+    {
+      id: 'lower',
+      icon: Dumbbell,
+      accent: '#6AC5FF',
+      kicker: 'Lower',
+      title: 'Lower Body',
+      subtitle: `${lowerPlanCount || 0} movements ready`,
+      detail: 'Squat, hinge, glutes, and calves.',
+      action: 'Open Lower Session',
+      onClick: () => onNavigate('STRENGTH_LOWER')
+    },
+    {
+      id: 'cardio',
+      icon: Activity,
+      accent: '#F6B73C',
+      kicker: 'Cardiovascular',
+      title: 'Cardio',
+      subtitle: '2:00 A • 2:00 B • 1:00 C',
+      detail: 'Steady build with a hard final minute.',
+      action: 'Start Cardio',
+      onClick: () => onNavigate('MANUAL_CARDIO')
+    },
+    {
+      id: 'stability',
+      icon: Zap,
+      accent: '#34D3FF',
+      kicker: 'Stability',
+      title: 'Stability',
+      subtitle: '10-minute core finisher',
+      detail: coreRoundValues.length ? `Latest: ${coreRoundValues[0]} rounds logged.` : 'Focused quality rounds after cardio.',
+      action: 'Open Stability',
+      onClick: () => onNavigate('MANUAL_CORE')
+    }
+  ];
 
   return (
-    <div className="flex-1 flex flex-col relative h-full">
-      <div className="px-6 pt-[safe-md] pb-4 flex justify-between items-center bg-opacity-95 backdrop-blur-md sticky top-0 z-50" style={{ backgroundColor: themeObj.bg }}>
+    <div className="flex-1 flex flex-col relative h-full overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <div
+          className="absolute -top-28 left-1/2 -translate-x-1/2 w-[620px] h-[400px] blur-[120px] opacity-20"
+          style={{ background: `radial-gradient(circle at center, ${themeObj.primary} 0%, transparent 72%)` }}
+        />
+        <div
+          className="absolute top-[36%] left-[-15%] w-[260px] h-[260px] blur-[100px] opacity-10"
+          style={{ background: `radial-gradient(circle at center, ${themeObj.primary} 0%, transparent 70%)` }}
+        />
+        {!isDarkTheme && (
+          <div
+            className="absolute bottom-[16%] right-[-10%] w-[260px] h-[220px] blur-[90px] opacity-20"
+            style={{ background: `radial-gradient(circle at center, ${themeObj.seafoam} 0%, transparent 72%)` }}
+          />
+        )}
+      </div>
+
+      <div
+        className="px-6 pt-[safe-md] pb-4 flex justify-between items-center sticky top-0 z-50 border-b backdrop-blur-xl"
+        style={{ backgroundColor: isDarkTheme ? 'rgba(4,7,12,0.72)' : 'rgba(241,246,253,0.82)', borderColor: themeObj.border }}
+      >
         <div>
-          <h1 className="text-[34px] font-[1000] tracking-tighter" style={{ color: themeObj.text }}>Today</h1>
-          <p className="text-[14px] font-bold uppercase opacity-50 tracking-widest" style={{ color: themeObj.textSecondary }}>
+          <h1 className="text-[34px] font-[1000] tracking-tighter leading-none" style={{ color: themeObj.text }}>Today</h1>
+          <p className="text-[12px] font-black uppercase opacity-60 tracking-[0.22em]" style={{ color: themeObj.textSecondary }}>
             {db.officialStarted ? `Block ${db.currentBlock} • Wk ${currentSlot.week}` : 'Practice Mode'}
           </p>
         </div>
-        <button onClick={toggleTheme} className="p-3 rounded-full border-2 transition-transform active:scale-90 outline-none focus-visible:ring-4 focus-visible:ring-blue-500" style={{ backgroundColor: themeObj.card, borderColor: themeObj.border }} aria-label="Toggle theme">
+        <button onClick={toggleTheme} className="p-3 rounded-full border transition-transform active:scale-90 outline-none focus-visible:ring-4 focus-visible:ring-blue-500" style={{ backgroundColor: themeObj.card, borderColor: themeObj.border }} aria-label="Toggle theme">
           {db.settings.theme === 'dark' ? <Sun size={20} color={themeObj.text} /> : <Moon size={20} color={themeObj.text} />}
         </button>
       </div>
 
-      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-[calc(12rem+env(safe-area-inset-bottom))]">
-        {db.officialStarted && (
-          <Card
-            themeObj={themeObj}
-            className="mb-8 relative overflow-hidden shadow-xl border-0"
-            onClick={() => onNavigate(currentSlot.type === 'OFF' ? 'OFF' : currentSlot.type === 'CARDIO' ? 'CARDIO' : 'STRENGTH')}
-          >
-            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: `linear-gradient(135deg, ${themeObj.primary}, transparent)` }} />
-            <div className="absolute top-6 right-6 opacity-20" style={{ color: themeObj.primary }}>{getSlotIcon(currentSlot.type)}</div>
-            <h2 className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: themeObj.primary }}>Current Protocol</h2>
-            <h3 className="text-[28px] font-black mb-4 tracking-tighter" style={{ color: themeObj.text }}>
-              {currentSlot.type === 'OFF' ? 'Recovery Day' : `${currentSlot.type} Session`}
-            </h3>
-            <div className="w-full h-2 rounded-full overflow-hidden mb-2" style={{ backgroundColor: themeObj.bg }}>
-              <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${officialProgressPct}%`, backgroundColor: themeObj.primary }} />
+      <div className="flex-1 px-6 pt-4 overflow-y-auto pb-[calc(12rem+env(safe-area-inset-bottom))] relative z-10">
+        <Card
+          themeObj={themeObj}
+          className="mb-8 relative overflow-hidden border shadow-2xl"
+          onClick={() => onNavigate(activeRoute)}
+          style={{
+            background: `linear-gradient(145deg, ${isDarkTheme ? '#0A1528' : '#F7FBFF'} 0%, ${isDarkTheme ? '#090C14' : '#EEF5FE'} 100%)`,
+            borderColor: isDarkTheme ? 'rgba(130,182,255,0.22)' : 'rgba(40,112,210,0.26)',
+            boxShadow: isDarkTheme ? '0 30px 65px rgba(0,0,0,0.5)' : '0 24px 42px rgba(24,68,130,0.16), 0 0 0 1px rgba(255,255,255,0.5) inset'
+          }}
+        >
+          <div className="pointer-events-none absolute inset-0 opacity-80" style={{ background: `radial-gradient(circle at 50% 0%, ${themeObj.primary}20 0%, transparent 68%)` }} />
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[38%] h-3 rounded-full blur-[14px]" style={{ backgroundColor: `${themeObj.primary}90` }} />
+          <div className="relative z-10">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[12px] font-black uppercase tracking-[0.24em] mb-2" style={{ color: themeObj.primary }}>Active Protocol</p>
+                <h2 className="text-[30px] sm:text-[38px] leading-[0.96] font-[1000] tracking-tighter" style={{ color: themeObj.text }}>
+                  {activeConfig.title}
+                </h2>
+                <p className="mt-2 text-[15px] font-semibold opacity-75" style={{ color: themeObj.textSecondary }}>
+                  Block {db.currentBlock} • Week {currentSlot.week}
+                </p>
+              </div>
+              <ActiveIcon size={30} color={activeConfig.accent} />
             </div>
-            <p className="text-[11px] font-black uppercase opacity-40" style={{ color: themeObj.text }}>Tap to engage engine</p>
-          </Card>
-        )}
+            <div className="my-5 h-px" style={{ backgroundColor: themeObj.border }} />
+            <div className="flex items-center justify-between gap-3 text-[15px] font-bold">
+              <div className="flex items-center gap-2" style={{ color: themeObj.textSecondary }}>
+                <Calendar size={16} />
+                <span>Estimated Duration</span>
+                <span style={{ color: themeObj.text }}>~{activeConfig.durationMin} min</span>
+              </div>
+              <div className="flex items-center gap-2" style={{ color: themeObj.textSecondary }}>
+                <Activity size={16} color={activeConfig.accent} />
+                <span>Completed</span>
+                <span style={{ color: themeObj.text }}>{completedDays}/42</span>
+              </div>
+            </div>
+            <div className="mt-5 rounded-[14px] border px-4 py-3 text-center text-[18px] font-black tracking-[0.14em] uppercase" style={{ borderColor: themeObj.border, color: themeObj.text }}>
+              Engage Training Engine
+            </div>
+            <div className="mt-4 h-2 rounded-full overflow-hidden" style={{ backgroundColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
+              <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${officialProgressPct}%`, backgroundColor: activeConfig.accent }} />
+            </div>
+          </div>
+        </Card>
 
         <div className="mb-6">
-          <h3 className="text-lg font-[900] tracking-tight mb-4 opacity-80" style={{ color: themeObj.text }}>Quick Start</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <Card themeObj={themeObj} className="flex flex-col items-center justify-center p-6 text-center border-0 shadow-md" onClick={() => onNavigate('STRENGTH_UPPER')}>
-              <Dumbbell size={32} className="mb-3" color={themeObj.primary} />
-              <span className="font-black text-[12px] uppercase tracking-widest" style={{ color: themeObj.text }}>Upper Body</span>
-            </Card>
-            <Card themeObj={themeObj} className="flex flex-col items-center justify-center p-6 text-center border-0 shadow-md" onClick={() => onNavigate('STRENGTH_LOWER')}>
-              <Dumbbell size={32} className="mb-3" color={themeObj.primary} />
-              <span className="font-black text-[12px] uppercase tracking-widest" style={{ color: themeObj.text }}>Lower Body</span>
-            </Card>
-            <Card themeObj={themeObj} className="flex flex-col items-center justify-center p-6 text-center border-0 shadow-md" onClick={() => onNavigate('MANUAL_CARDIO')}>
-              <Activity size={32} className="mb-3" color={themeObj.zoneB} />
-              <span className="font-black text-[12px] uppercase tracking-widest" style={{ color: themeObj.text }}>Cardio</span>
-            </Card>
-            <Card themeObj={themeObj} className="flex flex-col items-center justify-center p-6 text-center border-0 shadow-md" onClick={() => onNavigate('MANUAL_CORE')}>
-              <Zap size={32} className="mb-3" color={themeObj.primary} />
-              <span className="font-black text-[12px] uppercase tracking-widest" style={{ color: themeObj.text }}>Stability</span>
-            </Card>
+          <h3 className="text-[27px] leading-none font-[1000] tracking-tight mb-4" style={{ color: themeObj.text }}>Training Modules</h3>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {moduleCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <button
+                  key={card.id}
+                  onClick={card.onClick}
+                  className="relative overflow-hidden rounded-[22px] border p-3.5 sm:p-5 text-left outline-none focus-visible:ring-4 focus-visible:ring-blue-500 transition-transform active:scale-[0.985] min-h-[220px] sm:min-h-[256px]"
+                  style={{
+                    borderColor: isDarkTheme ? 'rgba(126,183,255,0.18)' : 'rgba(49,109,192,0.24)',
+                    background: `linear-gradient(145deg, ${isDarkTheme ? '#0B1323' : '#F8FCFF'} 0%, ${isDarkTheme ? '#0A0D15' : '#EDF5FE'} 100%)`,
+                    boxShadow: isDarkTheme ? '0 18px 36px rgba(0,0,0,0.45)' : '0 16px 28px rgba(20,70,120,0.14), 0 0 0 1px rgba(255,255,255,0.55) inset'
+                  }}
+                  aria-label={`Open ${card.title}`}
+                >
+                  <div className="pointer-events-none absolute inset-0 opacity-70" style={{ background: `radial-gradient(circle at 22% 0%, ${card.accent}${isDarkTheme ? '22' : '2B'} 0%, transparent 62%)` }} />
+                  <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[45%] h-2 rounded-full blur-[10px]" style={{ backgroundColor: `${themeObj.primary}${isDarkTheme ? '80' : '66'}` }} />
+
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-1.5 mb-1.5 sm:mb-2">
+                      <Icon size={17} color={card.accent} />
+                      <span className="text-[10px] sm:text-[12px] font-black uppercase tracking-[0.14em] opacity-70" style={{ color: themeObj.textSecondary }}>{card.kicker}</span>
+                    </div>
+                    <h4 className="text-[20px] sm:text-[30px] font-[1000] tracking-tighter leading-[1.0] mb-1.5" style={{ color: themeObj.text }}>{card.title}</h4>
+                    <p className="text-[14px] sm:text-[19px] font-semibold opacity-90 leading-tight" style={{ color: themeObj.text }}>{card.subtitle}</p>
+                    <p className="mt-2 text-[12px] sm:text-[15px] font-medium leading-snug opacity-85" style={{ color: themeObj.textSecondary }}>{card.detail}</p>
+                    <div className="mt-5 text-[10px] sm:text-[12px] font-black uppercase tracking-[0.15em]" style={{ color: card.accent }}>{card.action}</div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -697,14 +831,13 @@ function SwipeableExerciseRow({
   isCurrentExercise
 }) {
   const [dragX, setDragX] = useState(0);
-  const [startX, setStartX] = useState(null);
-  const [startY, setStartY] = useState(null);
-  const [isSwiping, setIsSwiping] = useState(false);
   const [limitPromptActive, setLimitPromptActive] = useState(false);
+  const gestureRef = useRef({ startX: null, startY: null, isSwiping: false });
 
   const SWIPE_THRESHOLD = 90;
-  const completedCount = exerciseCompletedSets || 0;
-  const isCompleteForThisCycle = completedCount > currentCycleFloor;
+  const completedCountRaw = exerciseCompletedSets || 0;
+  const completedCount = Math.min(completedCountRaw, 5);
+  const isCompleteForThisCycle = completedCountRaw >= 5 || completedCountRaw > currentCycleFloor;
 
   const hasLimitReached = useMemo(() => (currentLogs || []).some((l) => l.status === 'limit'), [currentLogs]);
   const advice = useMemo(() => {
@@ -715,34 +848,33 @@ function SwipeableExerciseRow({
 
   const handleStart = (x, y) => {
     if (isCompleteForThisCycle || limitPromptActive) return;
-    setStartX(x);
-    setStartY(y);
-    setIsSwiping(false);
+    gestureRef.current = { startX: x, startY: y, isSwiping: false };
   };
 
   const handleMove = (x, y) => {
+    const { startX, startY, isSwiping } = gestureRef.current;
     if (startX === null || startY === null || isCompleteForThisCycle || limitPromptActive) return;
     const diffX = x - startX;
     const diffY = y - startY;
 
     if (!isSwiping) {
-      if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 5) {
-        setStartX(null);
-        setStartY(null);
+      if (Math.abs(diffY) > Math.abs(diffX) * 1.15 && Math.abs(diffY) > 10) {
+        gestureRef.current = { startX: null, startY: null, isSwiping: false };
         return;
       }
-      if (Math.abs(diffX) > 10) {
-        setIsSwiping(true);
+      if (Math.abs(diffX) > 12 && Math.abs(diffX) > Math.abs(diffY)) {
+        gestureRef.current.isSwiping = true;
       }
     }
 
-    if (isSwiping) {
-      setDragX(diffX * 0.9);
+    if (gestureRef.current.isSwiping) {
+      const bounded = Math.max(-180, Math.min(180, diffX * 0.86));
+      setDragX(bounded);
     }
   };
 
   const handleEnd = () => {
-    if (startX === null) return;
+    if (gestureRef.current.startX === null) return;
     if (dragX > SWIPE_THRESHOLD) {
       if (hapticsEnabled) triggerHaptic('heavy');
       onCompleteSet({ status: 'success', reps: 10, weight });
@@ -751,9 +883,7 @@ function SwipeableExerciseRow({
       setLimitPromptActive(true);
     }
     setDragX(0);
-    setStartX(null);
-    setStartY(null);
-    setIsSwiping(false);
+    gestureRef.current = { startX: null, startY: null, isSwiping: false };
   };
 
   if (limitPromptActive) {
@@ -780,39 +910,57 @@ function SwipeableExerciseRow({
         {dragX > 0 ? <Check size={36} strokeWidth={4} /> : <AlertCircle size={36} strokeWidth={4} />}
       </div>
       <div
-        className="relative z-10 p-6 flex justify-between items-center transition-all duration-300 select-none touch-pan-y"
+        className="relative z-10 p-3.5 sm:p-4 h-[164px] sm:h-[170px] flex justify-between items-stretch transition-all duration-300 select-none touch-pan-y"
         style={{
           backgroundColor: bgFill,
           transform: `translateX(${dragX}px)`,
-          transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.35s ease',
+          transition: gestureRef.current.isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.35s ease',
           border: `2px solid ${isCompleteForThisCycle ? 'transparent' : isCurrentExercise ? themeObj.primary : themeObj.border}`,
           borderRadius: '24px',
           boxShadow: isCurrentExercise && !isCompleteForThisCycle ? `0 10px 28px -16px ${themeObj.primary}` : 'none'
         }}
-        onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); handleStart(e.clientX, e.clientY); }}
+        onPointerDown={(e) => { handleStart(e.clientX, e.clientY); }}
         onPointerMove={(e) => handleMove(e.clientX, e.clientY)}
         onPointerUp={handleEnd}
         onPointerCancel={handleEnd}
+        onPointerLeave={handleEnd}
       >
-        <div className="flex-1 pointer-events-none pr-4">
-          <div className="flex flex-col gap-1">
-            <h4 className="font-[1000] text-[20px] tracking-tight leading-tight uppercase" style={{ color: contrastColor }}>{exercise.name}</h4>
+        <div className="flex-1 pointer-events-none pr-4 min-w-0 flex flex-col justify-between">
+          <div className="min-h-[66px]">
+            <h4
+              title={exercise.name}
+              className="font-[700] text-[14px] sm:text-[15px] tracking-tight leading-[1.06] uppercase overflow-hidden"
+              style={{
+                color: contrastColor,
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical'
+              }}
+            >
+              {exercise.name}
+            </h4>
+          </div>
+          <div className="min-h-[18px]">
             {isCompleteForThisCycle ? (
-              <span className="text-[12px] font-black uppercase tracking-[0.2em] opacity-80" style={{ color: '#FFF' }}>{statusLabel}</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.18em] opacity-80" style={{ color: '#FFF' }}>{statusLabel}</span>
             ) : (
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {isCurrentExercise && <span className="text-[10px] font-black uppercase tracking-[0.16em] px-2 py-0.5 rounded" style={{ backgroundColor: themeObj.primary, color: '#fff' }}>CURRENT</span>}
-                <span className="text-[11px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-opacity-10" style={{ backgroundColor: themeObj.primary, color: themeObj.primary }}>10 REPS</span>
-                <span className="text-[10px] font-black uppercase tracking-widest" style={advice.style}>{advice.text}</span>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
+                  {isCurrentExercise && <span className="text-[9px] font-black uppercase tracking-[0.14em] px-2 py-0.5 rounded shrink-0" style={{ backgroundColor: themeObj.primary, color: '#fff' }}>CURRENT</span>}
+                  <span className="text-[10px] font-black uppercase tracking-[0.08em] px-2 py-0.5 rounded bg-opacity-10 shrink-0" style={{ backgroundColor: themeObj.primary, color: '#FFFFFF' }}>10 REPS</span>
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-[0.08em] leading-none" style={advice.style}>{advice.text}</span>
               </div>
             )}
-            {pastHistoryLogs && pastHistoryLogs.length > 0 && !isCompleteForThisCycle && (
-              <div className="text-[10px] font-bold opacity-30 mt-1" style={{ color: themeObj.text }}>PREV: {String(pastHistoryLogs[0]?.weight ?? 0)}lb ({pastHistoryLogs.map((l) => (l.status === 'success' ? '10' : String(l.reps))).join('•')})</div>
-            )}
+          </div>
+          <div className="h-[13px] mt-1 text-[9px] font-bold opacity-30 truncate" style={{ color: themeObj.text }}>
+            {pastHistoryLogs && pastHistoryLogs.length > 0 && !isCompleteForThisCycle
+              ? `PREV: ${String(pastHistoryLogs[0]?.weight ?? 0)}lb (${pastHistoryLogs.map((l) => (l.status === 'success' ? '10' : String(l.reps))).join('•')})`
+              : ' '}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-5">
+        <div className="flex items-center gap-2.5 sm:gap-4 self-center">
           <div
             className="flex flex-col items-center justify-center w-[80px] h-[80px] sm:w-[90px] sm:h-[90px] rounded-full border-[6px] relative shadow-lg transition-colors duration-300"
             style={{ borderColor: isCompleteForThisCycle ? 'rgba(255,255,255,0.4)' : themeObj.primary, backgroundColor: isCompleteForThisCycle ? 'rgba(0,0,0,0.1)' : 'transparent' }}
@@ -854,7 +1002,7 @@ function SwipeableExerciseRow({
             onTouchStart={(e) => e.stopPropagation()}
             className={`flex flex-col items-center justify-center min-w-[50px] transition-transform outline-none rounded-xl p-2 bg-black bg-opacity-0 hover:bg-opacity-5 ${completedCount > 0 ? 'active:scale-90 cursor-pointer' : 'opacity-40 cursor-default'}`}
           >
-            <span className="text-[28px] font-[1000] leading-none" style={{ color: contrastColor }}>{completedCount}</span>
+            <span className="text-[24px] font-[1000] leading-none" style={{ color: contrastColor }}>{completedCount}</span>
             <span className="text-[11px] font-black opacity-60 uppercase flex items-center justify-center gap-1 mt-1" style={{ color: contrastColor }}>
               / 5 {completedCount > 0 && <ResetIcon size={12} className="opacity-70" />}
             </span>
@@ -949,15 +1097,13 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
 
   const currentCycleFloor = useMemo(() => {
     if (exercises.length === 0) return 0;
-    return Math.min(...exercises.map((ex) => workoutLogs[ex.id]?.length || 0));
+    return Math.min(5, Math.min(...exercises.map((ex) => workoutLogs[ex.id]?.length || 0)));
   }, [exercises, workoutLogs]);
 
-  const currentCycle = Math.min(currentCycleFloor + 1, 5);
   const currentExerciseId = useMemo(() => {
     const first = exercises.find((ex) => (workoutLogs[ex.id]?.length || 0) === currentCycleFloor);
     return first?.id || null;
   }, [exercises, workoutLogs, currentCycleFloor]);
-  const currentExerciseName = exercises.find((ex) => ex.id === currentExerciseId)?.name;
 
   const prevCycleRef = useRef(0);
   useEffect(() => {
@@ -994,8 +1140,9 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
   }, [isResting, restTime, beepsEnabled, audioUnlocked, db.settings?.haptics]);
 
   const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
-  const allExercisesComplete = exercises.length > 0 && exercises.every((ex) => (workoutLogs[ex.id]?.length || 0) === 5);
-  const canFinalize = isManualSession ? Object.values(workoutLogs).flat().length > 0 : allExercisesComplete;
+  const allExercisesComplete = exercises.length > 0 && exercises.every((ex) => (workoutLogs[ex.id]?.length || 0) >= 5);
+  const completedSetCount = Object.values(workoutLogs).flat().length;
+  const canFinalize = isManualSession ? completedSetCount > 0 : allExercisesComplete;
 
   const restMinutes = String(Math.floor(restTime / 60));
   const restSeconds = String(restTime % 60).padStart(2, '0');
@@ -1019,6 +1166,38 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
       setDismissedAudioGate(true);
     }
   };
+  const toggleTheme = () => {
+    setDb((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, theme: prev.settings.theme === 'dark' ? 'light' : 'dark' }
+    }));
+  };
+  const buildStrengthPayload = () => ({
+    kind: 'STRENGTH',
+    slotType: currentSlotType,
+    elapsed,
+    workoutLogs,
+    totalSets: exercises.length * 5,
+    completedSets: completedSetCount
+  });
+  const handleHomePress = () => {
+    if (completedSetCount === 0) {
+      onCancel();
+      return;
+    }
+    if (canFinalize) {
+      const finalizeNow = typeof window === 'undefined'
+        ? true
+        : window.confirm('Finalize this workout before returning home?');
+      if (finalizeNow) onComplete(buildStrengthPayload());
+      else onCancel();
+      return;
+    }
+    const leaveWithoutFinalizing = typeof window === 'undefined'
+      ? true
+      : window.confirm('You have an unfinished workout. Leave without finalizing?');
+    if (leaveWithoutFinalizing) onCancel();
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden" style={{ backgroundColor: themeObj.bg }}>
@@ -1039,6 +1218,24 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
 
       {isResting && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center px-6 text-center" style={{ backgroundColor: '#050507' }}>
+          <div className="absolute right-6 top-[calc(env(safe-area-inset-top)+10px)] flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="h-10 w-10 rounded-full border flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white"
+              style={{ borderColor: 'rgba(255,255,255,0.24)', color: '#FFF', backgroundColor: 'rgba(255,255,255,0.08)' }}
+              aria-label="Toggle appearance"
+            >
+              {db.settings.theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+            <button
+              onClick={handleHomePress}
+              className="h-10 w-10 rounded-full border flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white"
+              style={{ borderColor: 'rgba(255,255,255,0.24)', color: '#FFF', backgroundColor: 'rgba(255,255,255,0.08)' }}
+              aria-label="Return home"
+            >
+              <Home size={17} />
+            </button>
+          </div>
           <span className="text-[11px] font-black uppercase tracking-[0.26em] mb-3" style={{ color: restUrgent ? '#FFD166' : 'rgba(255,255,255,0.55)' }}>
             REST
           </span>
@@ -1059,24 +1256,44 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
         </div>
       )}
 
-      <div className="px-6 pt-[safe-lg] pb-5 z-40 relative shadow-sm" style={{ backgroundColor: themeObj.card }}>
+      <div
+        className="absolute top-0 left-0 right-0 px-6 pt-[safe-lg] pb-4 z-40 backdrop-blur-xl border-b"
+        style={{
+          backgroundColor: db.settings.theme === 'dark' ? 'rgba(12,14,18,0.56)' : 'rgba(248,248,252,0.62)',
+          borderColor: db.settings.theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+        }}
+      >
         <div className="flex justify-between items-start gap-3">
           <div className="flex-1">
             <span className="text-[11px] font-black uppercase tracking-[0.22em]" style={{ color: themeObj.primary }}>Sequence Console</span>
             <h1 className="text-[30px] font-black tracking-tighter uppercase leading-tight" style={{ color: themeObj.text }}>{currentSlotType} Session</h1>
-            <p className="text-[12px] font-black uppercase tracking-[0.2em] opacity-70" style={{ color: themeObj.textSecondary }}>Cycle {currentCycle} of 5{currentExerciseName ? ` • ${currentExerciseName}` : ''}</p>
           </div>
           <div className="flex items-start gap-3">
             <div className="text-right mt-1">
               <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50" style={{ color: themeObj.text }}>Session Clock</span>
               <div className="text-[16px] font-black tabular-nums" style={{ color: themeObj.text }}>{formatTime(elapsed)}</div>
             </div>
-            <button onClick={onCancel} className="p-2 outline-none focus-visible:ring-2 rounded-full" style={{ color: themeObj.text }} aria-label="Exit workout"><X size={26} /></button>
+            <button
+              onClick={toggleTheme}
+              className="h-10 w-10 border rounded-full flex items-center justify-center outline-none focus-visible:ring-2"
+              style={{ borderColor: themeObj.border, color: themeObj.text, backgroundColor: themeObj.bg }}
+              aria-label="Toggle appearance"
+            >
+              {db.settings.theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+            <button
+              onClick={handleHomePress}
+              className="h-10 w-10 border rounded-full flex items-center justify-center outline-none focus-visible:ring-2"
+              style={{ borderColor: themeObj.border, color: themeObj.text, backgroundColor: themeObj.bg }}
+              aria-label="Return home"
+            >
+              <Home size={18} />
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 pt-[190px] sm:pt-[198px]">
         {exercises.length === 0 ? (
           <Card themeObj={themeObj} className="border-0 shadow-md">
             <h3 className="text-xl font-black tracking-tight mb-2" style={{ color: themeObj.text }}>No {currentSlotType.toLowerCase()} plan selected yet</h3>
@@ -1096,8 +1313,14 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
                 currentLogs={workoutLogs[ex.id] || []}
                 pastHistoryLogs={pastWorkout?.data?.workoutLogs?.[ex.id]}
                 onCompleteSet={(logEntry) => {
-                  setWorkoutLogs((prev) => ({ ...prev, [ex.id]: [...(prev[ex.id] || []), logEntry] }));
-                  if (beepsEnabled && audioUnlocked) void playBeep(860, 0.04, 0.08);
+                  let didAppend = false;
+                  setWorkoutLogs((prev) => {
+                    const existing = prev[ex.id] || [];
+                    if (existing.length >= 5) return prev;
+                    didAppend = true;
+                    return { ...prev, [ex.id]: [...existing, logEntry] };
+                  });
+                  if (didAppend && beepsEnabled && audioUnlocked) void playBeep(860, 0.04, 0.08);
                 }}
                 onUndoSet={() => {
                   setWorkoutLogs((prev) => {
@@ -1111,24 +1334,22 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
               />
             ))}
             <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
-            <div className="h-32" />
+            <div className={canFinalize ? 'h-28' : 'h-10'} />
           </>
         )}
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-6 pb-[safe-lg] z-30 bg-opacity-95 backdrop-blur-lg border-t" style={{ backgroundColor: themeObj.card, borderColor: themeObj.border }}>
-        <Button
-          onClick={() => onComplete({ kind: 'STRENGTH', slotType: currentSlotType, elapsed, workoutLogs, totalSets: exercises.length * 5, completedSets: Object.values(workoutLogs).flat().length })}
-          themeObj={themeObj}
-          disabled={!canFinalize}
-          className="py-5 shadow-lg uppercase tracking-widest"
-        >
-          {isManualSession || allExercisesComplete ? 'Finalize Workout' : 'Complete Cycle'}
-        </Button>
-        {!allExercisesComplete && !isManualSession && (
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-center mt-3 opacity-45" style={{ color: themeObj.text }}>Complete all 5 exercises to trigger strict 2:00 rest.</p>
-        )}
-      </div>
+      {canFinalize && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 pb-[safe-md] z-30 bg-opacity-85 backdrop-blur-lg border-t" style={{ backgroundColor: themeObj.card, borderColor: themeObj.border }}>
+          <Button
+            onClick={() => onComplete(buildStrengthPayload())}
+            themeObj={themeObj}
+            className="py-4 shadow-lg uppercase tracking-widest"
+          >
+            Finalize Workout
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1171,6 +1392,16 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
   const zoneColor = zone === 'A' ? themeObj.zoneA : zone === 'B' ? themeObj.zoneB : themeObj.zoneC;
   const nextZone = zone === 'A' ? 'Zone B' : zone === 'B' ? 'Zone C' : currentRound === 5 ? 'Complete' : 'Zone A';
   const isFinalCountdown = zoneTimeLeft <= 10 && zoneTimeLeft > 0;
+  const isDarkCardioTheme = db.settings.theme === 'dark';
+  const cardioBaseBg = isDarkCardioTheme ? '#04070B' : '#E7EEF7';
+  const cardioChromeBg = isDarkCardioTheme ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.72)';
+  const cardioChromeBorder = isDarkCardioTheme ? 'rgba(255,255,255,0.26)' : 'rgba(15,23,42,0.24)';
+  const cardioMainText = isDarkCardioTheme ? '#FFFFFF' : '#0F172A';
+  const cardioSubText = isDarkCardioTheme ? 'rgba(255,255,255,0.60)' : 'rgba(15,23,42,0.62)';
+  const cardioMutedText = isDarkCardioTheme ? 'rgba(255,255,255,0.55)' : 'rgba(15,23,42,0.52)';
+  const cardioOverlayGradient = isDarkCardioTheme
+    ? 'linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.48) 48%, rgba(0,0,0,0.26) 100%)'
+    : 'linear-gradient(180deg, rgba(255,255,255,0.76) 0%, rgba(242,247,252,0.58) 48%, rgba(223,233,244,0.42) 100%)';
 
   const phaseKey = `${currentRound}-${zone}`;
   const prevPhaseRef = useRef(phaseKey);
@@ -1222,6 +1453,12 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
       setDismissedAudioGate(true);
     }
   };
+  const toggleTheme = () => {
+    setDb((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, theme: prev.settings.theme === 'dark' ? 'light' : 'dark' }
+    }));
+  };
 
   if (showSummary) {
     return (
@@ -1259,7 +1496,7 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full relative overflow-hidden" style={{ backgroundColor: '#04070B' }}>
+    <div className="flex-1 flex flex-col h-full relative overflow-hidden" style={{ backgroundColor: cardioBaseBg }}>
       <AudioGateOverlay
         visible={showAudioGate}
         themeObj={themeObj}
@@ -1284,7 +1521,7 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
           className="absolute left-0 right-0 bottom-0 transition-all duration-700 ease-linear"
           style={{ height: `${zoneProgressPct}%`, backgroundColor: zoneColor, opacity: 0.86 }}
         />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.48) 48%, rgba(0,0,0,0.26) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: cardioOverlayGradient }} />
       </div>
 
       <div className="px-6 pt-[safe-lg] flex items-center justify-between z-20">
@@ -1292,83 +1529,77 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
           onClick={() => { setElapsed(0); setIsActive(false); setShowSummary(false); }}
           className="h-11 px-4 border rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-white"
           aria-label="Reset cardio"
-          disabled={isActive && elapsed > 0}
+          disabled={isActive || elapsed <= 0}
           style={{
-            borderColor: 'rgba(255,255,255,0.26)',
-            color: '#FFF',
-            backgroundColor: 'rgba(0,0,0,0.28)',
+            borderColor: cardioChromeBorder,
+            color: cardioMainText,
+            backgroundColor: cardioChromeBg,
             opacity: !isActive && elapsed > 0 ? 1 : 0.35
           }}
         >
           <ResetIcon size={20} />
         </button>
 
-        <button onClick={onCancel} className="h-11 w-11 border rounded-xl flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ borderColor: 'rgba(255,255,255,0.26)', color: '#FFF', backgroundColor: 'rgba(0,0,0,0.28)' }} aria-label="Exit cardio"><X size={22} /></button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleTheme}
+            className="h-11 w-11 border rounded-xl flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white"
+            style={{ borderColor: cardioChromeBorder, color: cardioMainText, backgroundColor: cardioChromeBg }}
+            aria-label="Toggle appearance"
+          >
+            {db.settings.theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <button
+            onClick={onCancel}
+            className="h-11 w-11 border rounded-xl flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-white"
+            style={{ borderColor: cardioChromeBorder, color: cardioMainText, backgroundColor: cardioChromeBg }}
+            aria-label="Return home"
+          >
+            <Home size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 z-20 text-center">
-        <p className="text-[12px] font-black uppercase tracking-[0.26em] text-white opacity-60">Round {currentRound} of 5</p>
+        <p className="text-[12px] font-black uppercase tracking-[0.26em]" style={{ color: cardioSubText }}>Round {currentRound} of 5</p>
         <div className={`mt-3 flex items-center gap-1 sm:gap-2 ${isFinalCountdown ? 'animate-pulse' : ''}`}>
           <RestFlipDigits value={cardioMinutes} label="MIN" isUrgent={isFinalCountdown} themeObj={themeObj} large />
-          <span className="text-[min(19vw,80px)] font-black pb-7" style={{ color: isFinalCountdown ? '#FFD166' : '#F8FAFC' }}>:</span>
+          <span className="text-[min(19vw,80px)] font-black pb-7" style={{ color: isFinalCountdown ? '#FFD166' : (isDarkCardioTheme ? '#F8FAFC' : '#0F172A') }}>:</span>
           <RestFlipDigits value={cardioSeconds} label="SEC" isUrgent={isFinalCountdown} themeObj={themeObj} large />
         </div>
         <p className="mt-3 text-[34px] font-black uppercase tracking-tight" style={{ color: zoneColor }}>{currentZoneName}</p>
-        <p className="mt-1 text-[11px] font-black uppercase tracking-[0.2em] text-white opacity-60">Next: {nextZone}</p>
+        <p className="mt-1 text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: cardioSubText }}>Next: {nextZone}</p>
         {lastTarget && (
-          <p className="mt-4 text-[11px] font-bold text-white opacity-55">Last target: {String(lastTarget[`zone${zone}`] || '—')}</p>
+          <p className="mt-4 text-[11px] font-bold" style={{ color: cardioMutedText }}>Last target: {String(lastTarget[`zone${zone}`] || '—')}</p>
         )}
       </div>
 
       <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
 
-      <div className="px-6 pt-3 pb-[safe-xl] flex flex-col items-center gap-3 z-20" style={{ backgroundColor: 'rgba(0,0,0,0.28)' }}>
+      <div
+        className="px-6 pt-0 flex flex-col items-center gap-3 z-20 -translate-y-10"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 28px)' }}
+      >
         <button
           onClick={async () => {
             await safeResumeAudio();
             setIsActive((v) => !v);
           }}
-          className="w-full max-w-[420px] h-[74px] rounded-[22px] border flex items-center justify-between px-4 shadow-2xl transition-transform active:scale-[0.98] outline-none focus-visible:ring-4 focus-visible:ring-white"
+          className="h-[156px] w-[156px] rounded-full border-2 flex items-center justify-center shadow-2xl transition-transform active:scale-95 outline-none focus-visible:ring-4 focus-visible:ring-white"
           style={{
-            background: 'linear-gradient(180deg, rgba(22,26,34,0.92) 0%, rgba(8,10,14,0.95) 100%)',
-            borderColor: isActive ? `${zoneColor}BB` : 'rgba(255,255,255,0.24)',
+            borderColor: isActive ? `${zoneColor}CC` : cardioChromeBorder,
+            background: cardioChromeBg,
+            color: isActive ? zoneColor : cardioMainText,
             boxShadow: isActive
-              ? `0 0 0 1px ${zoneColor}33 inset, 0 14px 34px rgba(0,0,0,0.45)`
-              : '0 14px 34px rgba(0,0,0,0.45)',
-            color: '#FFF'
+              ? `0 0 0 1px ${zoneColor}55 inset, 0 0 24px ${zoneColor}55`
+              : '0 12px 30px rgba(0,0,0,0.48)'
           }}
           aria-label={isActive ? 'Pause cardio' : 'Start cardio'}
         >
-          <div className="flex items-center gap-3">
-            <span
-              className="h-11 w-11 rounded-full border flex items-center justify-center"
-              style={{
-                borderColor: isActive ? `${zoneColor}CC` : 'rgba(255,255,255,0.28)',
-                backgroundColor: isActive ? `${zoneColor}22` : 'rgba(255,255,255,0.06)',
-                color: isActive ? zoneColor : '#F8FAFC'
-              }}
-            >
-              {isActive ? <Pause size={20} strokeWidth={3.2} /> : <Play size={20} strokeWidth={3.2} className="ml-0.5" />}
-            </span>
-            <div className="flex flex-col items-start">
-              <span className="text-[15px] font-black uppercase tracking-[0.16em]">{isActive ? 'Pause' : 'Start'}</span>
-              <span className="text-[10px] font-black uppercase tracking-[0.14em] opacity-55">
-                {isActive ? 'Interval Running' : 'Ready To Engage'}
-              </span>
-            </div>
-          </div>
-          <span
-            className="text-[11px] font-black uppercase tracking-[0.16em] rounded-full px-3 py-1 border"
-            style={{
-              borderColor: isActive ? `${zoneColor}80` : 'rgba(255,255,255,0.2)',
-              color: isActive ? zoneColor : 'rgba(255,255,255,0.68)',
-              backgroundColor: 'rgba(255,255,255,0.04)'
-            }}
-          >
-            {isActive ? 'Live' : 'Standby'}
-          </span>
+          {isActive ? <Pause size={52} strokeWidth={2.7} /> : <Play size={50} strokeWidth={2.7} className="ml-1" />}
         </button>
-        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white opacity-55">2:00 A • 2:00 B • 1:00 C rhythm</span>
+        <span className="text-[12px] font-black uppercase tracking-[0.2em]" style={{ color: cardioSubText }}>Cardio</span>
+        <span className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: cardioMutedText }}>2:00 A • 2:00 B • 1:00 C rhythm</span>
       </div>
     </div>
   );
@@ -1380,6 +1611,7 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
   const [rounds, setRounds] = useState(0);
   const [tapped, setTapped] = useState(new Set());
   const [roundFlash, setRoundFlash] = useState(false);
+  const roundCommitTimeoutRef = useRef(null);
 
   const { isSupported: wakeLockSupported } = useScreenWakeLock(true);
 
@@ -1411,8 +1643,14 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, elapsed, beepsEnabled, audioUnlocked]);
 
+  useEffect(() => {
+    return () => {
+      if (roundCommitTimeoutRef.current) clearTimeout(roundCommitTimeoutRef.current);
+    };
+  }, []);
+
   const toggleEx = (idx) => {
-    if (!isActive) return;
+    if (!isActive || roundFlash) return;
     const next = new Set(tapped);
     if (next.has(idx)) next.delete(idx);
     else next.add(idx);
@@ -1421,13 +1659,15 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
 
     if (next.size === 4) {
       setRoundFlash(true);
-      setRounds((r) => r + 1);
-      emitHaptic('medium');
-      if (beepsEnabled && audioUnlocked) void playBeep(1200, 0.04, 0.08);
-      setTimeout(() => {
+      emitHaptic('heavy');
+      if (beepsEnabled && audioUnlocked) void playBeep(1280, 0.06, 0.1);
+      if (roundCommitTimeoutRef.current) clearTimeout(roundCommitTimeoutRef.current);
+      roundCommitTimeoutRef.current = setTimeout(() => {
+        setRounds((r) => r + 1);
         setTapped(new Set());
         setRoundFlash(false);
-      }, 260);
+        roundCommitTimeoutRef.current = null;
+      }, 380);
     } else {
       emitHaptic('light');
     }
@@ -1440,9 +1680,21 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
       setDismissedAudioGate(true);
     }
   };
+  const toggleTheme = () => {
+    setDb((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, theme: prev.settings.theme === 'dark' ? 'light' : 'dark' }
+    }));
+  };
 
-  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
-  const totalProgressPct = Math.max(0, Math.min(100, ((600 - elapsed) / 600) * 100));
+  const coreMinutes = String(Math.floor(elapsed / 60));
+  const coreSeconds = String(elapsed % 60).padStart(2, '0');
+  const isFinalCountdown = elapsed <= 10 && elapsed > 0;
+  const showStartInCenter = elapsed === 600 && rounds === 0 && !isActive;
+  const canSaveCoreSession = !isActive && (rounds > 0 || elapsed === 0);
+  const coreIdleTintPrimary = db.settings.theme === 'dark' ? `${themeObj.primary}1A` : `${themeObj.primary}12`;
+  const coreIdleTintSeafoam = db.settings.theme === 'dark' ? `${themeObj.seafoam}12` : `${themeObj.seafoam}10`;
+  const coreIdleInset = db.settings.theme === 'dark' ? `${themeObj.primary}20` : `${themeObj.primary}14`;
 
   const exercises = [
     { name: 'Dead Bug', reps: '10 / side' },
@@ -1450,12 +1702,6 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     { name: 'Bird Dog', reps: '10 / side' },
     { name: 'Side Plank', reps: '20 sec / side' }
   ];
-
-  const ringSize = 300;
-  const ringStroke = 8;
-  const ringRadius = (ringSize - ringStroke) / 2;
-  const ringCircumference = 2 * Math.PI * ringRadius;
-  const ringOffset = ringCircumference * (1 - totalProgressPct / 100);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative" style={{ backgroundColor: themeObj.bg }}>
@@ -1474,41 +1720,48 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
       />
       <BlockedAudioChip beepsEnabled={beepsEnabled} audioUnlocked={audioUnlocked} themeObj={themeObj} onClick={() => setDismissedAudioGate(false)} />
 
-      <div className="px-6 pt-[safe-lg] pb-4 flex justify-between items-center z-10">
-        <div>
+      <div className="px-6 pt-[safe-lg] pb-4 z-10 relative">
+        <div className="text-center">
           <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: themeObj.primary }}>Post-Cardio Core</p>
-          <h1 className="text-[28px] font-[1000] tracking-tighter uppercase" style={{ color: themeObj.text }}>Round Engine</h1>
+          <h1 className="text-[28px] font-[1000] tracking-tighter uppercase" style={{ color: themeObj.text }}>Stability</h1>
         </div>
-        <button onClick={onCancel} className="p-3 rounded-full outline-none focus-visible:ring-2" style={{ color: themeObj.text, backgroundColor: themeObj.card }} aria-label="Exit core finisher"><X size={24} /></button>
+        <div className="absolute right-6 top-[calc(env(safe-area-inset-top)+8px)] flex items-center gap-2">
+          <button
+            onClick={toggleTheme}
+            className="h-11 w-11 rounded-full border flex items-center justify-center outline-none focus-visible:ring-2"
+            style={{ borderColor: themeObj.border, color: themeObj.text, backgroundColor: themeObj.card }}
+            aria-label="Toggle appearance"
+          >
+            {db.settings.theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <button
+            onClick={onCancel}
+            className="h-11 w-11 rounded-full border flex items-center justify-center outline-none focus-visible:ring-2"
+            style={{ borderColor: themeObj.border, color: themeObj.text, backgroundColor: themeObj.card }}
+            aria-label="Return home"
+          >
+            <Home size={20} />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto px-6 pb-32">
         <div className="mx-auto max-w-[460px]">
-          <div className="relative mx-auto w-[min(82vw,320px)] h-[min(82vw,320px)]">
-            <svg viewBox={`0 0 ${ringSize} ${ringSize}`} className="absolute inset-0 -rotate-90" aria-hidden="true">
-              <circle cx={ringSize / 2} cy={ringSize / 2} r={ringRadius} fill="none" stroke={themeObj.border} strokeWidth={ringStroke} />
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={ringRadius}
-                fill="none"
-                stroke={themeObj.primary}
-                strokeWidth={ringStroke}
-                strokeLinecap="round"
-                strokeDasharray={ringCircumference}
-                strokeDashoffset={ringOffset}
-                style={{ transition: 'stroke-dashoffset 0.35s linear' }}
-              />
-            </svg>
-
-            <div className={`absolute inset-[20%] rounded-full border flex flex-col items-center justify-center text-center transition-transform duration-200 ${roundFlash ? 'scale-105' : 'scale-100'}`} style={{ borderColor: themeObj.border, backgroundColor: themeObj.card }}>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60" style={{ color: themeObj.text }}>Round Count</span>
-              <span className="text-[60px] font-black leading-none tabular-nums" style={{ color: themeObj.text }}>{rounds}</span>
-              <span className="text-[12px] font-black uppercase tracking-[0.16em] opacity-60" style={{ color: themeObj.textSecondary }}>{formatTime(elapsed)} remaining</span>
-            </div>
+          <div className={`flex items-center justify-center gap-2 sm:gap-4 ${isFinalCountdown ? 'animate-pulse' : ''}`}>
+            <RestFlipDigits value={coreMinutes} label="MIN" isUrgent={isFinalCountdown} themeObj={themeObj} large />
+            <span className="text-[64px] font-black pb-6" style={{ color: isFinalCountdown ? '#FFD166' : '#F8FAFC' }}>:</span>
+            <RestFlipDigits value={coreSeconds} label="SEC" isUrgent={isFinalCountdown} themeObj={themeObj} large />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-7">
+          <div className="relative mt-12">
+            <div
+              className={`pointer-events-none absolute -inset-3 rounded-[34px] transition-all duration-300 ${roundFlash ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+              style={{
+                background: `radial-gradient(circle at center, ${themeObj.seafoam}66 0%, ${themeObj.seafoam}20 42%, transparent 78%)`,
+                filter: 'blur(12px)'
+              }}
+            />
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 relative z-10">
             {exercises.map((ex, idx) => {
               const done = tapped.has(idx);
               return (
@@ -1516,38 +1769,88 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
                   key={ex.name}
                   onClick={() => toggleEx(idx)}
                   aria-label={`Mark ${ex.name} complete`}
-                  className="rounded-2xl border p-4 text-left outline-none focus-visible:ring-4 transition-transform active:scale-[0.98]"
-                  style={{ borderColor: done ? themeObj.success : themeObj.border, backgroundColor: done ? `${themeObj.success}22` : themeObj.card }}
+                  className="rounded-3xl border h-[146px] sm:h-[162px] p-5 text-left outline-none focus-visible:ring-4 transition-transform active:scale-[0.98] flex flex-col justify-between"
+                  style={{
+                    borderColor: done ? `${themeObj.seafoam}${roundFlash ? 'EE' : 'A6'}` : themeObj.border,
+                    background: done
+                      ? roundFlash
+                        ? `linear-gradient(160deg, ${themeObj.seafoam}44 0%, ${themeObj.seafoam}22 30%, ${themeObj.card} 75%)`
+                        : `linear-gradient(165deg, ${themeObj.seafoam}24 0%, ${themeObj.card} 72%)`
+                      : `radial-gradient(circle at 16% 0%, ${coreIdleTintPrimary} 0%, transparent 58%), radial-gradient(circle at 100% 100%, ${coreIdleTintSeafoam} 0%, transparent 60%), linear-gradient(165deg, ${themeObj.card} 0%, ${db.settings.theme === 'dark' ? '#14161C' : '#F9F9FC'} 100%)`,
+                    boxShadow: done
+                      ? roundFlash
+                        ? `0 0 0 1px ${themeObj.seafoam}A0 inset, 0 0 42px ${themeObj.seafoam}88, 0 0 92px ${themeObj.seafoam}44`
+                        : `0 0 30px ${themeObj.seafoam}44`
+                      : `0 8px 20px rgba(0,0,0,0.16), 0 0 0 1px ${coreIdleInset} inset`
+                  }}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-[15px] font-black uppercase tracking-tight" style={{ color: themeObj.text }}>{ex.name}</h3>
-                    {done && <Check size={18} strokeWidth={3} color={themeObj.success} />}
+                    <h3 className="text-[18px] sm:text-[20px] font-black uppercase leading-tight tracking-tight" style={{ color: themeObj.text }}>{ex.name}</h3>
+                    {done && <Check size={18} strokeWidth={3} color={themeObj.seafoam} />}
                   </div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] opacity-60 mt-1" style={{ color: themeObj.textSecondary }}>{ex.reps}</p>
+                  <p className="text-[12px] font-bold uppercase tracking-[0.18em] opacity-68 mt-1" style={{ color: themeObj.textSecondary }}>{ex.reps}</p>
                 </button>
               );
             })}
+          </div>
           </div>
 
           <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
         </div>
       </div>
 
-      <div className="p-6 pb-[safe-xl] border-t" style={{ borderColor: themeObj.border, backgroundColor: themeObj.card }}>
-        {isActive ? (
-          <Button onClick={() => setIsActive(false)} themeObj={themeObj} variant="secondary" className="py-5 uppercase tracking-[0.22em]">Pause Engine</Button>
-        ) : (
-          <Button onClick={async () => { await safeResumeAudio(); setIsActive(true); }} themeObj={themeObj} className="py-5 uppercase tracking-[0.22em]">
-            {elapsed === 600 ? 'Start 10:00 Block' : elapsed > 0 ? 'Resume Block' : 'Block Complete'}
-          </Button>
-        )}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 z-20 pointer-events-none"
+        style={{ bottom: canSaveCoreSession ? 'calc(env(safe-area-inset-bottom) + 92px)' : 'calc(env(safe-area-inset-bottom) + 14px)' }}
+      >
+        <button
+          type="button"
+          onClick={async () => {
+            if (isActive || elapsed <= 0) return;
+            await safeResumeAudio();
+            setIsActive(true);
+          }}
+          className={`h-[128px] w-[128px] sm:h-[142px] sm:w-[142px] rounded-full border-4 flex flex-col items-center justify-center text-center transition-transform duration-200 outline-none focus-visible:ring-4 focus-visible:ring-blue-500 pointer-events-auto ${roundFlash ? 'scale-110' : 'scale-100'} ${isActive || elapsed <= 0 ? 'pointer-events-none' : 'active:scale-95 cursor-pointer'}`}
+          style={{
+            borderColor: themeObj.primary,
+            background: `radial-gradient(circle at 30% 30%, ${themeObj.primary}CC 0%, ${themeObj.primary} 55%, #0860C8 100%)`,
+            boxShadow: roundFlash
+              ? `0 0 62px ${themeObj.primary}CC, 0 0 110px ${themeObj.seafoam}55`
+              : `0 0 36px ${themeObj.primary}66`
+          }}
+          aria-label={elapsed === 600 ? 'Start core block' : 'Resume core block'}
+        >
+          {showStartInCenter ? (
+            <span className="text-[20px] font-black uppercase tracking-[0.2em]" style={{ color: '#FFF' }}>Start</span>
+          ) : (
+            <>
+              <span className="text-[11px] font-black uppercase tracking-[0.26em]" style={{ color: 'rgba(255,255,255,0.72)' }}>Rounds</span>
+              <span className="text-[58px] font-black leading-none tabular-nums" style={{ color: '#FFF' }}>{rounds}</span>
+            </>
+          )}
+        </button>
+      </div>
 
-        {!isActive && (rounds > 0 || elapsed === 0) && (
-          <Button onClick={() => onComplete({ kind: 'CORE', core: { rounds } })} themeObj={themeObj} variant="secondary" className="mt-3 py-4 uppercase tracking-[0.2em]">
+      {isActive && (
+        <div className="absolute right-6 z-20 pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 28px)' }}>
+          <button
+            onClick={() => setIsActive(false)}
+            className="h-12 w-12 rounded-full border-2 flex items-center justify-center outline-none focus-visible:ring-2 active:scale-95 pointer-events-auto"
+            style={{ borderColor: themeObj.border, color: themeObj.textSecondary, backgroundColor: themeObj.card }}
+            aria-label="Pause core block"
+          >
+            <Pause size={20} strokeWidth={3.2} />
+          </button>
+        </div>
+      )}
+
+      {canSaveCoreSession && (
+        <div className="p-4 pb-[safe-md] border-t" style={{ borderColor: themeObj.border, backgroundColor: themeObj.card }}>
+          <Button onClick={() => onComplete({ kind: 'CORE', core: { rounds } })} themeObj={themeObj} variant="secondary" className="py-4 uppercase tracking-[0.2em]">
             Save Core Session
           </Button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
