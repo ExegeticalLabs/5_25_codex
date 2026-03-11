@@ -15,3 +15,6 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+
+# Claude session data
+.claude/

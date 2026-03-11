@@ -61,6 +61,33 @@ const CATEGORIES = {
   ]
 };
 
+const CORE_COMBOS = {
+  combo1: [
+    { name: 'Dead Bug', reps: '10 / side' },
+    { name: 'RKC Plank', reps: '30 sec' },
+    { name: 'Bird Dog', reps: '10 / side' },
+    { name: 'Side Plank', reps: '20 sec / side' }
+  ],
+  combo2: [
+    { name: 'Reverse Crunch', reps: '15' },
+    { name: 'Hollow Hold', reps: '20 sec' },
+    { name: 'Forearm Plank', reps: '30 sec' },
+    { name: 'Plank Shoulder Taps', reps: '10 / side' }
+  ],
+  combo3: [
+    { name: 'Sit-Up (controlled)', reps: '15' },
+    { name: 'Reverse Crunch', reps: '15' },
+    { name: 'High Plank', reps: '30 sec' },
+    { name: 'Body Saw', reps: '10 controlled' }
+  ],
+  combo4: [
+    { name: 'Pallof Press', reps: '10 / side' },
+    { name: 'Side Plank', reps: '20 sec / side' },
+    { name: 'Bird Dog', reps: '10 / side' },
+    { name: 'RKC Plank', reps: '30 sec' }
+  ]
+};
+
 const COLORS = {
   light: { bg: '#F2F2F7', card: '#FFFFFF', primary: '#007AFF', text: '#000000', textSecondary: '#8E8E93', textMuted: '#AEAEB2', success: '#00FF87', danger: '#FF0055', zoneA: '#00FF87', zoneB: '#FFD700', zoneC: '#FF0055', border: '#E5E5EA', timerOverlay: '#000000', timerOverlayText: '#FFFFFF', seafoam: '#4FD1C5' },
   dark: { bg: '#000000', card: '#1C1C1E', primary: '#0A84FF', text: '#FFFFFF', textSecondary: '#8E8E93', textMuted: '#636366', success: '#00FF87', danger: '#FF0055', zoneA: '#00FF87', zoneB: '#FFD700', zoneC: '#FF0055', border: '#2C2C2E', timerOverlay: '#FFFFFF', timerOverlayText: '#000000', seafoam: '#38B2AC' }
@@ -96,6 +123,7 @@ const createDefaultState = () => ({
   pendingBlockReview: false,
   currentBlock: 1,
   currentSlotIndex: 0,
+  workoutsCompletedInBlock: 0,
   plan: { upper: [], lower: [] },
   usedInLastBlock: [],
   slots: generateBlockSlots(),
@@ -128,6 +156,17 @@ const normalizeDb = (parsed, audioUnlockedFlag = false) => {
   const parsedCustomByCombo = parsedCoreProgram.customByCombo && typeof parsedCoreProgram.customByCombo === 'object' ? parsedCoreProgram.customByCombo : {};
   const baseCoreProgram = createDefaultCoreProgram();
 
+  // Migration: Calculate workoutsCompletedInBlock from history if not present (pre-Item-1 data)
+  let workoutsCompletedInBlock = base.workoutsCompletedInBlock;
+  if (Number.isInteger(parsed.workoutsCompletedInBlock) && parsed.workoutsCompletedInBlock >= 0) {
+    workoutsCompletedInBlock = parsed.workoutsCompletedInBlock;
+  } else if (Array.isArray(parsed.history) && parsed.history.length > 0) {
+    const currentBlock = Number.isInteger(parsed.currentBlock) && parsed.currentBlock > 0 ? parsed.currentBlock : base.currentBlock;
+    workoutsCompletedInBlock = parsed.history
+      .filter((h) => h.official && h.block === currentBlock && h.data?.kind !== 'REST')
+      .length;
+  }
+
   return {
     ...base,
     ...parsed,
@@ -137,6 +176,7 @@ const normalizeDb = (parsed, audioUnlockedFlag = false) => {
     pendingBlockReview: Boolean(parsed.pendingBlockReview),
     currentBlock: Number.isInteger(parsed.currentBlock) && parsed.currentBlock > 0 ? parsed.currentBlock : base.currentBlock,
     currentSlotIndex: Number.isInteger(parsed.currentSlotIndex) && parsed.currentSlotIndex >= 0 ? parsed.currentSlotIndex : base.currentSlotIndex,
+    workoutsCompletedInBlock,
     plan: {
       upper: Array.isArray(parsedPlan.upper) ? parsedPlan.upper : base.plan.upper,
       lower: Array.isArray(parsedPlan.lower) ? parsedPlan.lower : base.plan.lower
@@ -165,10 +205,11 @@ const normalizeDb = (parsed, audioUnlockedFlag = false) => {
 
 const getInitialScreen = (state) => {
   if (state?.pendingBlockReview) return 'BLOCK_REVIEW';
-  return state?.onboarded ? 'HUB' : 'WELCOME';
+  if (!state?.onboarded) return state?.officialStarted ? 'SETUP' : 'WELCOME';
+  return 'HUB';
 };
 
-const getAdviceForExercise = (pastLogs) => {
+const getAdviceForExercise = (pastLogs, exerciseEaseRating) => {
   if (!pastLogs?.length) return { text: 'CALIBRATION' };
   const logs = [...pastLogs].reverse();
   const firstLimitIdx = logs.findIndex((l) => l.status === 'limit');
@@ -177,7 +218,7 @@ const getAdviceForExercise = (pastLogs) => {
     if (limitCycle <= 3) return { text: 'DROP LOAD' };
     return { text: 'KEEP LOAD' };
   }
-  return { text: 'INCREASE LOAD' };
+  return { text: exerciseEaseRating === 'easy' ? 'INCREASE LOAD' : 'KEEP LOAD' };
 };
 
 // =====================================================
@@ -615,7 +656,7 @@ function HubScreen({ db, setDb, onNavigate, themeObj }) {
   const clampPct = (n) => Math.max(0, Math.min(100, Math.round(n)));
   const blockHistory = (db.history || []).filter((h) => h.official && h.block === db.currentBlock);
   const completedDays = blockHistory.length;
-  const officialProgressPct = clampPct((db.currentSlotIndex / 42) * 100);
+  const officialProgressPct = clampPct((db.workoutsCompletedInBlock / 36) * 100);
   const upperPlanCount = (db.plan.upper || []).filter(Boolean).length;
   const lowerPlanCount = (db.plan.lower || []).filter(Boolean).length;
   const cardioEntries = blockHistory.filter((h) => h.data?.kind === 'CARDIO+CORE' || h.data?.kind === 'CARDIO');
@@ -760,7 +801,7 @@ function HubScreen({ db, setDb, onNavigate, themeObj }) {
               <div className="flex items-center gap-2" style={{ color: themeObj.textSecondary }}>
                 <Activity size={16} color={activeConfig.accent} />
                 <span>Completed</span>
-                <span style={{ color: themeObj.text }}>{completedDays}/42</span>
+                <span style={{ color: themeObj.text }}>{db.workoutsCompletedInBlock}/36 workouts</span>
               </div>
             </div>
             <div className="mt-5 rounded-[14px] border px-4 py-3 text-center text-[18px] font-black tracking-[0.14em] uppercase" style={{ borderColor: themeObj.border, color: themeObj.text }}>
@@ -823,6 +864,7 @@ function SwipeableExerciseRow({
   exerciseCompletedSets,
   currentLogs,
   pastHistoryLogs,
+  pastExerciseEaseRating,
   onCompleteSet,
   onUndoSet,
   hapticsEnabled,
@@ -841,10 +883,10 @@ function SwipeableExerciseRow({
 
   const hasLimitReached = useMemo(() => (currentLogs || []).some((l) => l.status === 'limit'), [currentLogs]);
   const advice = useMemo(() => {
-    const a = getAdviceForExercise(pastHistoryLogs);
+    const a = getAdviceForExercise(pastHistoryLogs, pastExerciseEaseRating);
     const color = a.text === 'DROP LOAD' ? themeObj.danger : a.text === 'KEEP LOAD' ? themeObj.primary : a.text === 'INCREASE LOAD' ? themeObj.success : themeObj.textMuted;
     return { ...a, style: { color } };
-  }, [pastHistoryLogs, themeObj]);
+  }, [pastHistoryLogs, pastExerciseEaseRating, themeObj]);
 
   const handleStart = (x, y) => {
     if (isCompleteForThisCycle || limitPromptActive) return;
@@ -889,7 +931,8 @@ function SwipeableExerciseRow({
   if (limitPromptActive) {
     return (
       <Card themeObj={themeObj} className="mb-4 border-2 p-5 flex flex-col items-center shadow-lg" style={{ borderColor: themeObj.danger }}>
-        <div className="text-[12px] font-black uppercase tracking-widest mb-4" style={{ color: themeObj.text }}>Select Limit Reps</div>
+        <div className="text-[12px] font-black uppercase tracking-widest mb-2" style={{ color: themeObj.text }}>Select Limit Reps</div>
+        <p className="text-[10px] font-medium opacity-70 mb-3 text-center max-w-[240px] leading-snug" style={{ color: themeObj.text }}>Failure = breaking form, rushing tempo, shortening range, or not hitting 10 reps</p>
         <div className="flex gap-2 flex-wrap justify-center">
           {[5, 6, 7, 8, 9].map((num) => (
             <button key={num} onClick={() => { onCompleteSet({ status: 'limit', reps: num, weight }); setLimitPromptActive(false); }} className="w-14 h-14 rounded-full font-black text-white shadow-md active:scale-110" style={{ backgroundColor: themeObj.danger }}>{num}</button>
@@ -1077,6 +1120,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
   const [weights, setWeights] = useState({});
   const [isResting, setIsResting] = useState(false);
   const [restTime, setRestTime] = useState(120);
+  const [exerciseEaseRatings, setExerciseEaseRatings] = useState({});
 
   const { isSupported: wakeLockSupported } = useScreenWakeLock(true);
 
@@ -1088,7 +1132,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
   const emitThud = async () => { if (beepsEnabled && audioUnlocked) await playTransitionThud(); };
   const emitHaptic = (style = 'medium') => { if (db.settings?.haptics) triggerHaptic(style); };
 
-  const pastWorkout = useMemo(() => db.history.find((h) => h.data?.kind === 'STRENGTH' && h.data?.slotType === currentSlotType), [db.history, currentSlotType]);
+  const pastWorkout = useMemo(() => db.history.find((h) => h.data?.kind === 'STRENGTH' && h.data?.slotType === currentSlotType && h.official !== false), [db.history, currentSlotType]);
 
   useEffect(() => {
     const int = setInterval(() => setElapsed((p) => p + 1), 1000);
@@ -1144,11 +1188,18 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
   const completedSetCount = Object.values(workoutLogs).flat().length;
   const canFinalize = isManualSession ? completedSetCount > 0 : allExercisesComplete;
 
+  const perfectExercises = useMemo(() => {
+    return exercises.filter((ex) => {
+      const logs = workoutLogs[ex.id] || [];
+      return logs.length === 5 && logs.every((l) => l.status === 'success');
+    });
+  }, [exercises, workoutLogs]);
+
   const restMinutes = String(Math.floor(restTime / 60));
   const restSeconds = String(restTime % 60).padStart(2, '0');
   const restUrgent = restTime <= 15;
   const restHint = currentCycleFloor <= 1
-    ? `Cycle ${currentCycleFloor} complete • Up next: Cycle ${Math.min(currentCycleFloor + 1, 5)}`
+    ? `Cycle ${currentCycleFloor} complete • Up next: Cycle ${Math.min(currentCycleFloor + 1, 5)}${currentCycleFloor === 1 ? ' • Check form & ROM' : ''}`
     : currentCycleFloor <= 3
       ? 'Fail 2–3 = drop load'
       : 'Fail 4–5 = keep load';
@@ -1172,14 +1223,21 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
       settings: { ...prev.settings, theme: prev.settings.theme === 'dark' ? 'light' : 'dark' }
     }));
   };
-  const buildStrengthPayload = () => ({
-    kind: 'STRENGTH',
-    slotType: currentSlotType,
-    elapsed,
-    workoutLogs,
-    totalSets: exercises.length * 5,
-    completedSets: completedSetCount
-  });
+  const buildStrengthPayload = () => {
+    const finalEaseRatings = {};
+    perfectExercises.forEach((ex) => {
+      finalEaseRatings[ex.id] = exerciseEaseRatings[ex.id] === 'easy' ? 'easy' : 'challenging';
+    });
+    return {
+      kind: 'STRENGTH',
+      slotType: currentSlotType,
+      elapsed,
+      workoutLogs,
+      exerciseEaseRatings: finalEaseRatings,
+      totalSets: exercises.length * 5,
+      completedSets: completedSetCount
+    };
+  };
   const handleHomePress = () => {
     if (completedSetCount === 0) {
       onCancel();
@@ -1301,6 +1359,14 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
           </Card>
         ) : (
           <>
+            {currentCycleFloor === 0 && (
+              <Card themeObj={themeObj} className="mb-4 border-0 shadow-sm p-3.5">
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] block mb-1.5" style={{ color: themeObj.primary }}>Tempo Basics</span>
+                <p className="text-[12px] leading-relaxed opacity-70" style={{ color: themeObj.text }}>
+                  Move 2 seconds up, 2 seconds down. Stop if form breaks or you can't reach 10 reps.
+                </p>
+              </Card>
+            )}
             {exercises.map((ex) => (
               <SwipeableExerciseRow
                 key={ex.id}
@@ -1312,6 +1378,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
                 exerciseCompletedSets={workoutLogs[ex.id]?.length || 0}
                 currentLogs={workoutLogs[ex.id] || []}
                 pastHistoryLogs={pastWorkout?.data?.workoutLogs?.[ex.id]}
+                pastExerciseEaseRating={pastWorkout?.data?.exerciseEaseRatings?.[ex.id]}
                 onCompleteSet={(logEntry) => {
                   let didAppend = false;
                   setWorkoutLogs((prev) => {
@@ -1334,13 +1401,42 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
               />
             ))}
             <WakeLockNotice isSupported={wakeLockSupported} themeObj={themeObj} />
-            <div className={canFinalize ? 'h-28' : 'h-10'} />
+            <div className={canFinalize ? (perfectExercises.length > 0 ? 'h-44' : 'h-28') : 'h-10'} />
           </>
         )}
       </div>
 
       {canFinalize && (
         <div className="absolute bottom-0 left-0 right-0 p-4 pb-[safe-md] z-30 bg-opacity-85 backdrop-blur-lg border-t" style={{ backgroundColor: themeObj.card, borderColor: themeObj.border }}>
+          {perfectExercises.length > 0 && (
+            <div className="mb-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] block mb-2" style={{ color: themeObj.textSecondary }}>
+                Perfect sets — felt easy?
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {perfectExercises.map((ex) => {
+                  const isEasy = exerciseEaseRatings[ex.id] === 'easy';
+                  return (
+                    <button
+                      key={ex.id}
+                      onClick={() => setExerciseEaseRatings((prev) => ({
+                        ...prev,
+                        [ex.id]: prev[ex.id] === 'easy' ? 'challenging' : 'easy'
+                      }))}
+                      className="px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors"
+                      style={{
+                        borderColor: isEasy ? themeObj.success : themeObj.border,
+                        backgroundColor: isEasy ? themeObj.success : 'transparent',
+                        color: isEasy ? '#FFF' : themeObj.textSecondary
+                      }}
+                    >
+                      {ex.name}{isEasy ? ' ✓' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <Button
             onClick={() => onComplete(buildStrengthPayload())}
             themeObj={themeObj}
@@ -1696,12 +1792,8 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
   const coreIdleTintSeafoam = db.settings.theme === 'dark' ? `${themeObj.seafoam}12` : `${themeObj.seafoam}10`;
   const coreIdleInset = db.settings.theme === 'dark' ? `${themeObj.primary}20` : `${themeObj.primary}14`;
 
-  const exercises = [
-    { name: 'Dead Bug', reps: '10 / side' },
-    { name: 'RKC Plank', reps: '30 sec' },
-    { name: 'Bird Dog', reps: '10 / side' },
-    { name: 'Side Plank', reps: '20 sec / side' }
-  ];
+  const activeComboId = `combo${((db.currentBlock - 1) % 4) + 1}`;
+  const exercises = CORE_COMBOS[activeComboId];
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative" style={{ backgroundColor: themeObj.bg }}>
@@ -2053,6 +2145,12 @@ export default function App() {
   };
 
   const handleComplete = (data, isManual = false) => {
+    // Safeguard: block review pending—freeze official progression until next block starts
+    if (db.pendingBlockReview && !isManual) {
+      console.warn('Cannot log official workout while block review is pending. Use "Start Next Block" to continue.');
+      return;
+    }
+
     const entry = {
       date: new Date().toISOString(),
       block: isManual ? null : db.currentBlock,
@@ -2062,27 +2160,32 @@ export default function App() {
     };
 
     const nextIdx = isManual ? db.currentSlotIndex : db.currentSlotIndex + 1;
+    const isRestWorkout = !isManual && data.kind === 'REST';
+    const workoutIncrement = (!isManual && !isRestWorkout) ? 1 : 0;
+    const newWorkoutCount = db.workoutsCompletedInBlock + workoutIncrement;
 
-    if (!isManual && nextIdx >= 42) {
+    // Block completion: triggered by 36th official workout (non-REST)
+    if (!isManual && !isRestWorkout && newWorkoutCount >= 36) {
       const oldNames = [...(db.plan.upper || []), ...(db.plan.lower || [])].map((e) => e.name);
 
       setDb((prev) => ({
         ...prev,
         history: [entry, ...prev.history],
-        onboarded: false,
-        officialStarted: false,
-        currentSlotIndex: 0,
-        currentBlock: prev.currentBlock + 1,
+        currentSlotIndex: nextIdx,
+        workoutsCompletedInBlock: newWorkoutCount,
+        pendingBlockReview: true,
         usedInLastBlock: oldNames
       }));
-      setScreen('WELCOME');
+      setScreen('BLOCK_REVIEW');
       return;
     }
 
+    // Normal progression: all other workouts and OFF days
     setDb((prev) => ({
       ...prev,
       history: [entry, ...prev.history],
-      currentSlotIndex: nextIdx
+      currentSlotIndex: nextIdx,
+      workoutsCompletedInBlock: newWorkoutCount
     }));
     setScreen('HUB');
   };
@@ -2113,15 +2216,63 @@ export default function App() {
         return <HistoryScreen db={db} onBack={() => setScreen('HUB')} themeObj={themeObj} />;
       case 'SETTINGS':
         return <SettingsScreen db={db} setDb={setDb} onBack={() => setScreen('HUB')} onImportBackup={handleImportBackup} themeObj={themeObj} />;
-      case 'BLOCK_REVIEW':
+      case 'BLOCK_REVIEW': {
+        const blockHistory = db.history.filter((h) => h.official && h.block === db.currentBlock);
+        const completedDays = blockHistory.length;
+        const avgDuration = blockHistory.length > 0
+          ? Math.round(blockHistory.reduce((sum, h) => sum + (Number(h.data?.elapsed) || 0), 0) / blockHistory.length / 60)
+          : 0;
+
+        const handleStartNextBlock = () => {
+          setDb((prev) => ({
+            ...prev,
+            pendingBlockReview: false,
+            currentBlock: prev.currentBlock + 1,
+            currentSlotIndex: 0,
+            workoutsCompletedInBlock: 0,
+            plan: { upper: [], lower: [] },
+            onboarded: false
+          }));
+          setScreen('SETUP');
+        };
+
         return (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center" style={{ backgroundColor: themeObj.bg, color: themeObj.text }}>
-            <Calendar size={64} className="mb-6 opacity-30" />
-            <h1 className="text-4xl font-black mb-4 uppercase leading-tight">Block Review</h1>
-            <p className="text-lg opacity-60 font-medium mb-10 leading-relaxed">Next-block guided review is ready for implementation in the next phase.</p>
-            <Button onClick={() => setScreen('HUB')} themeObj={themeObj}>Return to Hub</Button>
+          <div className="flex-1 flex flex-col p-6 overflow-hidden" style={{ backgroundColor: themeObj.bg }}>
+            <div className="pt-[safe-md] mb-8 flex-1 flex flex-col justify-center items-center text-center">
+              <div className="mb-8">
+                <Calendar size={72} className="mb-6 mx-auto opacity-40" style={{ color: themeObj.primary }} />
+                <h1 className="text-5xl font-black mb-2 uppercase leading-tight" style={{ color: themeObj.text }}>Block {db.currentBlock}</h1>
+                <p className="text-xl font-bold opacity-60" style={{ color: themeObj.text }}>Complete</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-12 w-full max-w-xs">
+                <Card themeObj={themeObj} className="p-4 flex flex-col items-center">
+                  <span className="text-4xl font-black" style={{ color: themeObj.primary }}>{completedDays}</span>
+                  <span className="text-xs uppercase font-bold opacity-60 mt-2">Sessions</span>
+                </Card>
+                <Card themeObj={themeObj} className="p-4 flex flex-col items-center">
+                  <span className="text-4xl font-black" style={{ color: themeObj.primary }}>{avgDuration}</span>
+                  <span className="text-xs uppercase font-bold opacity-60 mt-2">Avg Min</span>
+                </Card>
+              </div>
+
+              <p className="text-lg font-medium opacity-70 mb-10 max-w-sm leading-relaxed" style={{ color: themeObj.text }}>
+                You've completed {completedDays} training sessions. Ready to start the next block?
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 pb-[safe-lg]">
+              <Button
+                onClick={handleStartNextBlock}
+                variant="primary"
+                themeObj={themeObj}
+              >
+                Start Block {db.currentBlock + 1}
+              </Button>
+            </div>
           </div>
         );
+      }
       case 'OFF':
         return (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center" style={{ backgroundColor: themeObj.bg, color: themeObj.text }}>
