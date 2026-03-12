@@ -292,17 +292,17 @@ Note: A standalone `kind: 'CARDIO'` is emitted by `CardioWorkout.onComplete` (li
 
 ### 10. Repository Status
 
-**Repository snapshot (as of 2026-03-11):**
+**Repository snapshot (as of 2026-03-12):**
 
 | Property | Value |
 |---|---|
 | **Branch** | `main` |
-| **Latest commit** | `5b3b649883fab28e1d1cb11abc2790786462ac29` |
-| **Commit subject** | "Align 5/25 app behavior with program spec" |
-| **Commit date** | 2026-03-11 14:15:48 -0500 |
-| **Working tree** | **Dirty** — `app/page.jsx` has uncommitted modifications |
+| **Latest commit** | `1cdf28502d27689e824f413197db9c524c0b42b1` |
+| **Commit subject** | "Commit UX/UI polish pass and canonical project handoff" |
+| **Commit date** | 2026-03-12 05:28:37 -0500 |
+| **Working tree** | **Clean** |
 | **Remote** | `origin` → `https://github.com/ExegeticalLabs/5_25_codex.git` |
-| **Push state** | Latest commit (`5b3b649`) is pushed to `origin/main`. All UX/UI polish work (terminology fix, audio reliability, cardio early exit, history names, Hub CTA, ease-rating layout, haptics label, beep volumes) exists only as uncommitted local changes in `app/page.jsx`. |
+| **Push state** | All UX/UI polish work and this handoff document are committed and pushed to `origin/main`. |
 
 **Build commands:**
 ```bash
@@ -338,7 +338,7 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install --project-directory=ios/App
 >
 > **⚠️ WARNING:** The README's "Alignment Completed" section uses stale terminology ("KEEP LOAD" / "INCREASE LOAD"). The code uses "KEEP RESISTANCE" / "INCREASE RESISTANCE". Trust the code, not the README.
 >
-> **⚠️ REPO STATE:** As of 2026-03-11, all UX/UI polish work is uncommitted local changes to `app/page.jsx`. The last commit (`5b3b649`) on `main` predates these changes.
+> **⚠️ REPO STATE:** As of 2026-03-12, all UX/UI polish work and this handoff are committed and pushed on `main` at `1cdf285`.
 >
 > Read `app/page.jsx` in full before making any changes. Key functions: `getAdviceForExercise()` (line ~212), `normalizeDb()` (line ~140), `buildStrengthPayload()` (line ~1159), `handleComplete()` (line ~2017), screen routing in `render()` (line ~2063).
 
@@ -348,6 +348,6 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install --project-directory=ios/App
 
 MyoBound is a fully functional iOS workout app with a complete training system: 36-workout block model, 5-cycle strength sessions with swipe gestures and progressive overload advice, zone-based cardio intervals, and timed core stability finishers. The core application logic is concentrated in `app/page.jsx`, with a Capacitor native bridge and standard config/style files supporting it.
 
-A UX/UI polish pass addressed 10 items: progression terminology, a `.reverse()` cycle-detection bug, audio reliability, rest hint copy, cardio early exit, durable history exercise names, Hub CTA affordance, ease-rating layout, haptics label, and beep volumes. All polish work exists as uncommitted local changes; the last pushed commit predates it. The remaining work items are cosmetic or quality-of-life (core combo label, equipment persistence, sound design variety, settings layout).
+A UX/UI polish pass addressed 10 items: progression terminology, a `.reverse()` cycle-detection bug, audio reliability, rest hint copy, cardio early exit, durable history exercise names, Hub CTA affordance, ease-rating layout, haptics label, and beep volumes. All polish work is committed and pushed. The remaining work items are cosmetic or quality-of-life (core combo label, equipment persistence, sound design variety, settings layout).
 
 The codebase has 3 pieces of dead code (`playCountdownTriple`, `unlockAudio`, `TimerOverlay`), dead schema (`coreProgram` fields), stale README terminology, and zero test coverage. The app is buildable and syncable to iOS via Capacitor.
