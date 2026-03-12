@@ -10,7 +10,7 @@ This file orients a new AI agent (or human operator) to the MyoBound project. Re
 2. **`PROJECT_HANDOFF.md`** — full implementation status, data model, user flows, remaining work, technical debt
 3. **`PROGRAM_DOCTRINE.md`** — the 5/25 training method rules the app must preserve
 4. **`app/page.jsx`** — the entire application (2,142 lines: all components, state, logic)
-5. **`lib/native.js`** — Capacitor native bridge (133 lines: persistence, haptics, wake lock, export)
+5. **`lib/native.js`** — Capacitor native bridge (132 lines: persistence, haptics, wake lock, export)
 6. **`README.md`** — alignment history and build commands (note: lines 39–42 are stale)
 7. **`capacitor.config.json`**, **`package.json`** — platform and dependency configuration
 
