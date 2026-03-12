@@ -287,28 +287,8 @@ const playBeep = async (freq = 900, vol = 0.05, duration = 0.1) => {
   });
 };
 
-const playCountdownTriple = async () => {
-  await playBeep(950, 0.06, 0.08);
-  await new Promise((r) => setTimeout(r, 220));
-  await playBeep(950, 0.06, 0.08);
-  await new Promise((r) => setTimeout(r, 220));
-  await playBeep(950, 0.06, 0.08);
-};
-
 const playTransitionThud = async () => {
   await playBeep(350, 0.1, 0.4);
-};
-
-const unlockAudio = async () => {
-  const ctx = getAudioCtx();
-  if (!ctx) return false;
-  try {
-    if (ctx.state === 'suspended') await ctx.resume();
-    await playBeep(440, 0.0001, 0.03);
-    return ctx.state === 'running';
-  } catch {
-    return false;
-  }
 };
 
 const triggerHaptic = (style = 'medium') => {
@@ -384,22 +364,6 @@ function Button({ children, onClick, variant = 'primary', className = '', themeO
     >
       {children}
     </button>
-  );
-}
-
-function TimerOverlay({ label, timeStr, themeObj }) {
-  return (
-    <div
-      className="fixed left-1/2 -translate-x-1/2 rounded-[14px] px-4 py-2 flex flex-col items-center justify-center z-30 shadow-lg pointer-events-none transition-all duration-300"
-      style={{
-        backgroundColor: themeObj.timerOverlay,
-        color: themeObj.timerOverlayText,
-        top: 'calc(max(40px, env(safe-area-inset-top) + 12px))'
-      }}
-    >
-      <span className="text-[9px] uppercase font-bold opacity-80">{label}</span>
-      <span className="text-[18px] font-black leading-none tabular-nums tracking-tighter">{timeStr}</span>
-    </div>
   );
 }
 

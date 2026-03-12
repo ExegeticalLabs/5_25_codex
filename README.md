@@ -66,7 +66,7 @@ Three targeted guidance placements, no row-level clutter:
 
 ### Item 5 — Per-Exercise Easy/Challenging Load Progression
 
-Perfect sessions (5 cycles, all success, no limits) default to KEEP LOAD unless the user marks the exercise as "felt easy" at finalize time. Ratings are collected per exercise, not per session. A compact toggle section appears above the Finalize button showing only qualifying exercises. Each defaults to "challenging"; tapping toggles to "easy." Stored in `data.exerciseEaseRatings` in the history entry. `getAdviceForExercise()` returns INCREASE LOAD only when `exerciseEaseRating === 'easy'`.
+Perfect sessions (5 cycles, all success, no limits) default to KEEP RESISTANCE unless the user marks the exercise as "felt easy" at finalize time. Ratings are collected per exercise, not per session. A compact toggle section appears above the Finalize button showing only qualifying exercises. Each defaults to "challenging"; tapping toggles to "easy." Stored in `data.exerciseEaseRatings` in the history entry. `getAdviceForExercise()` returns INCREASE RESISTANCE only when `exerciseEaseRating === 'easy'`.
 
 ### Manual-Session Exclusion Rule
 
