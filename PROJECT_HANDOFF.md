@@ -276,16 +276,12 @@ Note: A standalone `kind: 'CARDIO'` is emitted by `CardioWorkout.onComplete` (li
 
 | Item | Location | Notes |
 |---|---|---|
-| **Dead code: `playCountdownTriple`** | Line 290 | Defined, zero call sites (grep-confirmed) |
-| **Dead code: `unlockAudio`** | Line 302 | Defined, zero call sites (grep-confirmed) |
-| **Dead code: `TimerOverlay`** | Line 390 | Component defined, zero call sites (grep-confirmed) |
-| **Dead schema: `coreProgram`** | Lines 108–117 | `mode`, `selectedComboId`, `customByCombo` stored/migrated but never read by UI. Active combo derived from block number. |
+| **Dead schema: `coreProgram`** | Lines ~108–117 | `mode`, `selectedComboId`, `customByCombo` stored/migrated but never read by UI. Active combo derived from block number. |
 | **No tests** | — | Zero test files exist in the repository. |
-| **`window.confirm()` / `alert()`** | Lines 1183, 1190, 1905, 1913, 1959 | Native browser dialogs, not themed. |
-| **Cardio equipment not persisted** | Line 1378 | Defaults to `'Treadmill'` every session. |
-| **`eslint-disable-next-line` suppressions** | Lines 1102, 1123, 1460, 1644 | 4 instances suppressing `react-hooks/exhaustive-deps` in timer effects. Intentional (timer callbacks reference stale closures by design). |
-| **README stale terminology** | `README.md` line 69 | Still says "KEEP LOAD" and "INCREASE LOAD" — code uses "KEEP RESISTANCE" and "INCREASE RESISTANCE". **A future assistant reading README first will get conflicting info.** |
-| **Dual audio-unlock persistence** | Lines 2002, 44 | `settings.audioUnlocked` written inside main DB blob AND separately under `myobound_audioUnlocked` key. Both merged on hydration (line 199). Works but is a non-obvious pattern. |
+| **`window.confirm()` / `alert()`** | Multiple locations | Native browser dialogs, not themed. |
+| **Cardio equipment not persisted** | `CardioWorkout` | Defaults to `'Treadmill'` every session. |
+| **`eslint-disable-next-line` suppressions** | 4 timer effects | Suppressing `react-hooks/exhaustive-deps`. Intentional (timer callbacks reference stale closures by design). |
+| **Dual audio-unlock persistence** | `settings.audioUnlocked` | Written inside main DB blob AND separately under `myobound_audioUnlocked` key. Both merged on hydration. Works but is a non-obvious pattern. |
 | **CocoaPods Ruby 4.0 UTF-8** | Build pipeline | `pod install` may fail with `Encoding::CompatibilityError` on Ruby 4.0 systems. Workaround: `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install --project-directory=ios/App` |
 
 ---
@@ -297,12 +293,12 @@ Note: A standalone `kind: 'CARDIO'` is emitted by `CardioWorkout.onComplete` (li
 | Property | Value |
 |---|---|
 | **Branch** | `main` |
-| **Latest commit** | `1cdf28502d27689e824f413197db9c524c0b42b1` |
-| **Commit subject** | "Commit UX/UI polish pass and canonical project handoff" |
-| **Commit date** | 2026-03-12 05:28:37 -0500 |
+| **Latest commit** | `2d85701bef0492ced334b27d396068a557e6bad6` |
+| **Commit subject** | "Remove dead code and fix stale README terminology" |
+| **Commit date** | 2026-03-12 06:51:47 -0500 |
 | **Working tree** | **Clean** |
 | **Remote** | `origin` → `https://github.com/ExegeticalLabs/5_25_codex.git` |
-| **Push state** | All UX/UI polish work and this handoff document are committed and pushed to `origin/main`. |
+| **Push state** | All work (UX/UI polish, Tier 1 cleanup, handoff document) committed and pushed to `origin/main`. |
 
 **Build commands:**
 ```bash
@@ -336,9 +332,7 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install --project-directory=ios/App
 >
 > **Critical constraint:** Do not change core 5/25 behavior. Do not refactor the architecture. Do not add major new features without explicit approval. All changes should be minimal, safe, and approved one at a time.
 >
-> **⚠️ WARNING:** The README's "Alignment Completed" section uses stale terminology ("KEEP LOAD" / "INCREASE LOAD"). The code uses "KEEP RESISTANCE" / "INCREASE RESISTANCE". Trust the code, not the README.
->
-> **⚠️ REPO STATE:** As of 2026-03-12, all UX/UI polish work and this handoff are committed and pushed on `main` at `1cdf285`.
+> **⚠️ REPO STATE:** As of 2026-03-12, all work (UX/UI polish, dead code cleanup, handoff) is committed and pushed on `main` at `2d85701`.
 >
 > Read `app/page.jsx` in full before making any changes. Key functions: `getAdviceForExercise()` (line ~212), `normalizeDb()` (line ~140), `buildStrengthPayload()` (line ~1159), `handleComplete()` (line ~2017), screen routing in `render()` (line ~2063).
 
@@ -350,4 +344,4 @@ MyoBound is a fully functional iOS workout app with a complete training system: 
 
 A UX/UI polish pass addressed 10 items: progression terminology, a `.reverse()` cycle-detection bug, audio reliability, rest hint copy, cardio early exit, durable history exercise names, Hub CTA affordance, ease-rating layout, haptics label, and beep volumes. All polish work is committed and pushed. The remaining work items are cosmetic or quality-of-life (core combo label, equipment persistence, sound design variety, settings layout).
 
-The codebase has 3 pieces of dead code (`playCountdownTriple`, `unlockAudio`, `TimerOverlay`), dead schema (`coreProgram` fields), stale README terminology, and zero test coverage. The app is buildable and syncable to iOS via Capacitor.
+Remaining technical debt: dead schema (`coreProgram` fields), zero test coverage, and unpersisted cardio equipment choice. The app is buildable and syncable to iOS via Capacitor.
