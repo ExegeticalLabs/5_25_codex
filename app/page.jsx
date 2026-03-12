@@ -211,14 +211,13 @@ const getInitialScreen = (state) => {
 
 const getAdviceForExercise = (pastLogs, exerciseEaseRating) => {
   if (!pastLogs?.length) return { text: 'CALIBRATION' };
-  const logs = [...pastLogs].reverse();
-  const firstLimitIdx = logs.findIndex((l) => l.status === 'limit');
+  const firstLimitIdx = pastLogs.findIndex((l) => l.status === 'limit');
   if (firstLimitIdx !== -1) {
     const limitCycle = firstLimitIdx + 1;
-    if (limitCycle <= 3) return { text: 'DROP LOAD' };
-    return { text: 'KEEP LOAD' };
+    if (limitCycle <= 3) return { text: 'REDUCE RESISTANCE' };
+    return { text: 'KEEP RESISTANCE' };
   }
-  return { text: exerciseEaseRating === 'easy' ? 'INCREASE LOAD' : 'KEEP LOAD' };
+  return { text: exerciseEaseRating === 'easy' ? 'INCREASE RESISTANCE' : 'KEEP RESISTANCE' };
 };
 
 // =====================================================
@@ -441,63 +440,6 @@ function BottomNav({ currentScreen, onNavigate, themeObj }) {
   );
 }
 
-function AudioGateOverlay({ visible, themeObj, onEnable, onTest, onDismiss }) {
-  if (!visible) return null;
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ width: 'min(520px, 100%)', background: themeObj.card, borderRadius: 24, padding: 24, color: themeObj.text, border: `1px solid ${themeObj.border}`, boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
-        <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Volume2 size={24} color={themeObj.primary} /> Enable Sound
-        </div>
-        <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 24, lineHeight: 1.5, fontWeight: 500 }}>
-          On iOS and Safari, timer beeps are blocked until you tap once to unlock audio. Unlock now to hear intervals in this session.
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button
-            onClick={onEnable}
-            className="outline-none focus-visible:ring-4 focus-visible:ring-blue-500 transition-transform active:scale-95"
-            style={{ flex: 1, padding: '14px 16px', borderRadius: 14, border: 'none', fontWeight: 900, background: themeObj.primary, color: '#fff', fontSize: 15 }}
-          >
-            Unlock Audio
-          </button>
-          <button
-            onClick={onTest}
-            className="outline-none focus-visible:ring-4 focus-visible:ring-blue-500 active:scale-95 transition-transform"
-            style={{ padding: '14px 16px', borderRadius: 14, border: `2px solid ${themeObj.border}`, background: 'transparent', color: themeObj.text, fontWeight: 900, fontSize: 15 }}
-          >
-            Test Beep
-          </button>
-        </div>
-        <button
-          onClick={onDismiss}
-          className="outline-none focus-visible:ring-2 active:opacity-50 transition-opacity"
-          style={{ marginTop: 16, width: '100%', padding: '12px 12px', borderRadius: 14, border: 'none', background: 'transparent', color: themeObj.textSecondary, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', fontSize: 11 }}
-        >
-          Not now
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function BlockedAudioChip({ beepsEnabled, audioUnlocked, themeObj, onClick }) {
-  if (!beepsEnabled || audioUnlocked) return null;
-  return (
-    <button
-      onClick={onClick}
-      className="absolute right-4 z-40 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg border outline-none focus-visible:ring-2 animate-pulse transition-all"
-      style={{
-        backgroundColor: themeObj.danger,
-        borderColor: 'rgba(255,255,255,0.2)',
-        color: '#FFF',
-        top: 'calc(max(40px, env(safe-area-inset-top) + 12px))'
-      }}
-    >
-      <Volume2 size={12} strokeWidth={3} />
-      <span className="text-[9px] font-black uppercase tracking-widest">Sound Locked</span>
-    </button>
-  );
-}
 
 function WakeLockNotice({ isSupported, themeObj }) {
   if (isSupported) return null;
@@ -804,7 +746,7 @@ function HubScreen({ db, setDb, onNavigate, themeObj }) {
                 <span style={{ color: themeObj.text }}>{db.workoutsCompletedInBlock}/36 workouts</span>
               </div>
             </div>
-            <div className="mt-5 rounded-[14px] border px-4 py-3 text-center text-[18px] font-black tracking-[0.14em] uppercase" style={{ borderColor: themeObj.border, color: themeObj.text }}>
+            <div className="mt-5 rounded-[14px] px-4 py-3 text-center text-[18px] font-black tracking-[0.14em] uppercase" style={{ backgroundColor: themeObj.primary, color: '#FFFFFF' }}>
               Engage Training Engine
             </div>
             <div className="mt-4 h-2 rounded-full overflow-hidden" style={{ backgroundColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
@@ -884,7 +826,7 @@ function SwipeableExerciseRow({
   const hasLimitReached = useMemo(() => (currentLogs || []).some((l) => l.status === 'limit'), [currentLogs]);
   const advice = useMemo(() => {
     const a = getAdviceForExercise(pastHistoryLogs, pastExerciseEaseRating);
-    const color = a.text === 'DROP LOAD' ? themeObj.danger : a.text === 'KEEP LOAD' ? themeObj.primary : a.text === 'INCREASE LOAD' ? themeObj.success : themeObj.textMuted;
+    const color = a.text === 'REDUCE RESISTANCE' ? themeObj.danger : a.text === 'KEEP RESISTANCE' ? themeObj.primary : a.text === 'INCREASE RESISTANCE' ? themeObj.success : themeObj.textMuted;
     return { ...a, style: { color } };
   }, [pastHistoryLogs, pastExerciseEaseRating, themeObj]);
 
@@ -916,6 +858,7 @@ function SwipeableExerciseRow({
   };
 
   const handleEnd = () => {
+    void safeResumeAudio();
     if (gestureRef.current.startX === null) return;
     if (dragX > SWIPE_THRESHOLD) {
       if (hapticsEnabled) triggerHaptic('heavy');
@@ -1125,11 +1068,8 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
   const { isSupported: wakeLockSupported } = useScreenWakeLock(true);
 
   const beepsEnabled = Boolean(db.settings?.beeps);
-  const audioUnlocked = Boolean(db.settings?.audioUnlocked);
-  const [dismissedAudioGate, setDismissedAudioGate] = useState(false);
-  const showAudioGate = beepsEnabled && !audioUnlocked && !dismissedAudioGate;
 
-  const emitThud = async () => { if (beepsEnabled && audioUnlocked) await playTransitionThud(); };
+  const emitThud = async () => { if (beepsEnabled) await playTransitionThud(); };
   const emitHaptic = (style = 'medium') => { if (db.settings?.haptics) triggerHaptic(style); };
 
   const pastWorkout = useMemo(() => db.history.find((h) => h.data?.kind === 'STRENGTH' && h.data?.slotType === currentSlotType && h.official !== false), [db.history, currentSlotType]);
@@ -1168,7 +1108,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
       int = setInterval(() => {
         setRestTime((p) => {
           if (p <= 10 && p > 0 && db.settings?.haptics) emitHaptic('light');
-          if (p <= 3 && p > 0 && beepsEnabled && audioUnlocked) void playBeep(980, 0.05, 0.06);
+          if (p <= 3 && p > 0 && beepsEnabled) void playBeep(980, 0.11, 0.06);
           if (p <= 1) {
             setIsResting(false);
             void emitThud();
@@ -1181,7 +1121,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
     }
     return () => clearInterval(int);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isResting, restTime, beepsEnabled, audioUnlocked, db.settings?.haptics]);
+  }, [isResting, restTime, beepsEnabled, db.settings?.haptics]);
 
   const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
   const allExercisesComplete = exercises.length > 0 && exercises.every((ex) => (workoutLogs[ex.id]?.length || 0) >= 5);
@@ -1201,8 +1141,8 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
   const restHint = currentCycleFloor <= 1
     ? `Cycle ${currentCycleFloor} complete • Up next: Cycle ${Math.min(currentCycleFloor + 1, 5)}${currentCycleFloor === 1 ? ' • Check form & ROM' : ''}`
     : currentCycleFloor <= 3
-      ? 'Fail 2–3 = drop load'
-      : 'Fail 4–5 = keep load';
+      ? 'Fail 2–3 = reduce resistance'
+      : 'Fail 4–5 = keep resistance';
   const skipRestNow = () => {
     setRestTime(0);
     setIsResting(false);
@@ -1210,13 +1150,6 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
     void emitThud();
   };
 
-  const handleAudioUnlock = async () => {
-    const ok = await unlockAudio();
-    if (ok) {
-      setDb((prev) => ({ ...prev, settings: { ...prev.settings, audioUnlocked: true } }));
-      setDismissedAudioGate(true);
-    }
-  };
   const toggleTheme = () => {
     setDb((prev) => ({
       ...prev,
@@ -1233,6 +1166,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
       slotType: currentSlotType,
       elapsed,
       workoutLogs,
+      exerciseNames: Object.fromEntries(exercises.map((ex) => [ex.id, ex.name])),
       exerciseEaseRatings: finalEaseRatings,
       totalSets: exercises.length * 5,
       completedSets: completedSetCount
@@ -1259,21 +1193,6 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden" style={{ backgroundColor: themeObj.bg }}>
-      <AudioGateOverlay
-        visible={showAudioGate}
-        themeObj={themeObj}
-        onEnable={handleAudioUnlock}
-        onTest={async () => {
-          const ok = await playBeep(740, 0.12, 0.08);
-          if (ok) {
-            setDb((prev) => ({ ...prev, settings: { ...prev.settings, audioUnlocked: true } }));
-            setDismissedAudioGate(true);
-          }
-        }}
-        onDismiss={() => setDismissedAudioGate(true)}
-      />
-      <BlockedAudioChip beepsEnabled={beepsEnabled} audioUnlocked={audioUnlocked} themeObj={themeObj} onClick={() => setDismissedAudioGate(false)} />
-
       {isResting && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center px-6 text-center" style={{ backgroundColor: '#050507' }}>
           <div className="absolute right-6 top-[calc(env(safe-area-inset-top)+10px)] flex items-center gap-2">
@@ -1387,7 +1306,7 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
                     didAppend = true;
                     return { ...prev, [ex.id]: [...existing, logEntry] };
                   });
-                  if (didAppend && beepsEnabled && audioUnlocked) void playBeep(860, 0.04, 0.08);
+                  if (didAppend && beepsEnabled) void playBeep(860, 0.10, 0.08);
                 }}
                 onUndoSet={() => {
                   setWorkoutLogs((prev) => {
@@ -1413,25 +1332,27 @@ function StrengthWorkout({ db, setDb, onComplete, onCancel, workoutTypeOverride,
               <span className="text-[10px] font-black uppercase tracking-[0.16em] block mb-2" style={{ color: themeObj.textSecondary }}>
                 Perfect sets — felt easy?
               </span>
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
                 {perfectExercises.map((ex) => {
                   const isEasy = exerciseEaseRatings[ex.id] === 'easy';
                   return (
-                    <button
-                      key={ex.id}
-                      onClick={() => setExerciseEaseRatings((prev) => ({
-                        ...prev,
-                        [ex.id]: prev[ex.id] === 'easy' ? 'challenging' : 'easy'
-                      }))}
-                      className="px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors"
-                      style={{
-                        borderColor: isEasy ? themeObj.success : themeObj.border,
-                        backgroundColor: isEasy ? themeObj.success : 'transparent',
-                        color: isEasy ? '#FFF' : themeObj.textSecondary
-                      }}
-                    >
-                      {ex.name}{isEasy ? ' ✓' : ''}
-                    </button>
+                    <div key={ex.id} className="flex items-start justify-between gap-3">
+                      <span className="flex-1 min-w-0 text-[12px] font-bold leading-snug pt-1" style={{ color: themeObj.text }}>{ex.name}</span>
+                      <button
+                        onClick={() => setExerciseEaseRatings((prev) => ({
+                          ...prev,
+                          [ex.id]: prev[ex.id] === 'easy' ? 'challenging' : 'easy'
+                        }))}
+                        className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors"
+                        style={{
+                          borderColor: isEasy ? themeObj.success : themeObj.border,
+                          backgroundColor: isEasy ? themeObj.success : 'transparent',
+                          color: isEasy ? '#FFF' : themeObj.textSecondary
+                        }}
+                      >
+                        {isEasy ? 'Easy ✓' : 'Easy'}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1463,11 +1384,8 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
   const { isSupported: wakeLockSupported } = useScreenWakeLock(true);
 
   const beepsEnabled = Boolean(db.settings?.beeps);
-  const audioUnlocked = Boolean(db.settings?.audioUnlocked);
-  const [dismissedAudioGate, setDismissedAudioGate] = useState(false);
-  const showAudioGate = beepsEnabled && !audioUnlocked && !dismissedAudioGate;
 
-  const emitThud = async () => { if (beepsEnabled && audioUnlocked) await playTransitionThud(); };
+  const emitThud = async () => { if (beepsEnabled) await playTransitionThud(); };
   const emitHaptic = (style = 'medium') => { if (db.settings?.haptics) triggerHaptic(style); };
 
   const lastCardio = useMemo(() => db.history.find((h) => h.data?.cardio), [db.history]);
@@ -1521,7 +1439,7 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
           const nextZoneLeft = nextTimeInRound < 120 ? 120 - nextTimeInRound : nextTimeInRound < 240 ? 240 - nextTimeInRound : 300 - nextTimeInRound;
 
           if (nextZoneLeft <= 10 && nextZoneLeft > 0 && db.settings?.haptics) emitHaptic('light');
-          if (nextZoneLeft <= 3 && nextZoneLeft > 0 && beepsEnabled && audioUnlocked) void playBeep(1040, 0.05, 0.06);
+          if (nextZoneLeft <= 3 && nextZoneLeft > 0 && beepsEnabled) void playBeep(1040, 0.11, 0.06);
           if (nextZoneLeft === 0) {
             void emitThud();
             emitHaptic('heavy');
@@ -1540,21 +1458,16 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
     }
     return () => clearInterval(int);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, beepsEnabled, audioUnlocked, db.settings?.haptics]);
+  }, [isActive, beepsEnabled, db.settings?.haptics]);
 
-  const handleAudioUnlock = async () => {
-    const ok = await unlockAudio();
-    if (ok) {
-      setDb((prev) => ({ ...prev, settings: { ...prev.settings, audioUnlocked: true } }));
-      setDismissedAudioGate(true);
-    }
-  };
   const toggleTheme = () => {
     setDb((prev) => ({
       ...prev,
       settings: { ...prev.settings, theme: prev.settings.theme === 'dark' ? 'light' : 'dark' }
     }));
   };
+
+  const handleFinishEarly = () => { setIsActive(false); setShowSummary(true); };
 
   if (showSummary) {
     return (
@@ -1593,21 +1506,6 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
 
   return (
     <div className="flex-1 flex flex-col h-full relative overflow-hidden" style={{ backgroundColor: cardioBaseBg }}>
-      <AudioGateOverlay
-        visible={showAudioGate}
-        themeObj={themeObj}
-        onEnable={handleAudioUnlock}
-        onTest={async () => {
-          const ok = await playBeep(740, 0.12, 0.08);
-          if (ok) {
-            setDb((prev) => ({ ...prev, settings: { ...prev.settings, audioUnlocked: true } }));
-            setDismissedAudioGate(true);
-          }
-        }}
-        onDismiss={() => setDismissedAudioGate(true)}
-      />
-      <BlockedAudioChip beepsEnabled={beepsEnabled} audioUnlocked={audioUnlocked} themeObj={themeObj} onClick={() => setDismissedAudioGate(false)} />
-
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
         <div
           className={`absolute inset-0 transition-all duration-300 ${phasePulse ? 'opacity-100' : 'opacity-90'}`}
@@ -1696,6 +1594,16 @@ function CardioWorkout({ db, setDb, onComplete, onCancel, themeObj }) {
         </button>
         <span className="text-[12px] font-black uppercase tracking-[0.2em]" style={{ color: cardioSubText }}>Cardio</span>
         <span className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: cardioMutedText }}>2:00 A • 2:00 B • 1:00 C rhythm</span>
+        {!isActive && elapsed > 0 && (
+          <button
+            onClick={handleFinishEarly}
+            className="mt-2 px-6 py-2 rounded-full border text-[11px] font-black uppercase tracking-[0.18em] active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white"
+            style={{ borderColor: cardioChromeBorder, color: cardioSubText, backgroundColor: cardioChromeBg }}
+            aria-label="Finish cardio and log session"
+          >
+            Finish Cardio &amp; Log
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1712,11 +1620,8 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
   const { isSupported: wakeLockSupported } = useScreenWakeLock(true);
 
   const beepsEnabled = Boolean(db.settings?.beeps);
-  const audioUnlocked = Boolean(db.settings?.audioUnlocked);
-  const [dismissedAudioGate, setDismissedAudioGate] = useState(false);
-  const showAudioGate = beepsEnabled && !audioUnlocked && !dismissedAudioGate;
 
-  const emitThud = async () => { if (beepsEnabled && audioUnlocked) await playTransitionThud(); };
+  const emitThud = async () => { if (beepsEnabled) await playTransitionThud(); };
   const emitHaptic = (style = 'medium') => { if (db.settings?.haptics) triggerHaptic(style); };
 
   useEffect(() => {
@@ -1724,7 +1629,7 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     if (isActive && elapsed > 0) {
       int = setInterval(() => {
         setElapsed((p) => {
-          if (p <= 3 && p > 0 && beepsEnabled && audioUnlocked) void playBeep(980, 0.05, 0.06);
+          if (p <= 3 && p > 0 && beepsEnabled) void playBeep(980, 0.11, 0.06);
           if (p <= 1) {
             emitHaptic('heavy');
             void emitThud();
@@ -1737,7 +1642,7 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     }
     return () => clearInterval(int);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, elapsed, beepsEnabled, audioUnlocked]);
+  }, [isActive, elapsed, beepsEnabled]);
 
   useEffect(() => {
     return () => {
@@ -1756,7 +1661,7 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     if (next.size === 4) {
       setRoundFlash(true);
       emitHaptic('heavy');
-      if (beepsEnabled && audioUnlocked) void playBeep(1280, 0.06, 0.1);
+      if (beepsEnabled) void playBeep(1280, 0.12, 0.1);
       if (roundCommitTimeoutRef.current) clearTimeout(roundCommitTimeoutRef.current);
       roundCommitTimeoutRef.current = setTimeout(() => {
         setRounds((r) => r + 1);
@@ -1769,13 +1674,6 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
     }
   };
 
-  const handleAudioUnlock = async () => {
-    const ok = await unlockAudio();
-    if (ok) {
-      setDb((prev) => ({ ...prev, settings: { ...prev.settings, audioUnlocked: true } }));
-      setDismissedAudioGate(true);
-    }
-  };
   const toggleTheme = () => {
     setDb((prev) => ({
       ...prev,
@@ -1797,21 +1695,6 @@ function CoreFinisher({ db, setDb, onComplete, onCancel, themeObj }) {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative" style={{ backgroundColor: themeObj.bg }}>
-      <AudioGateOverlay
-        visible={showAudioGate}
-        themeObj={themeObj}
-        onEnable={handleAudioUnlock}
-        onTest={async () => {
-          const ok = await playBeep(740, 0.12, 0.08);
-          if (ok) {
-            setDb((prev) => ({ ...prev, settings: { ...prev.settings, audioUnlocked: true } }));
-            setDismissedAudioGate(true);
-          }
-        }}
-        onDismiss={() => setDismissedAudioGate(true)}
-      />
-      <BlockedAudioChip beepsEnabled={beepsEnabled} audioUnlocked={audioUnlocked} themeObj={themeObj} onClick={() => setDismissedAudioGate(false)} />
-
       <div className="px-6 pt-[safe-lg] pb-4 z-10 relative">
         <div className="text-center">
           <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: themeObj.primary }}>Post-Cardio Core</p>
@@ -1976,9 +1859,14 @@ function HistoryScreen({ db, onBack, themeObj }) {
 
               {h.data?.workoutLogs && (
                 <div className="mt-3 space-y-2 opacity-60 text-xs font-bold" style={{ color: themeObj.text }}>
-                  {Object.entries(h.data.workoutLogs).map(([id, logs], idx) => (
-                    <div key={`${id}-${idx}`}>• {String(logs?.[0]?.weight || 0)}lb ({Array.isArray(logs) ? logs.map((l) => (l.status === 'success' ? '10' : String(l.reps))).join('•') : ''})</div>
-                  ))}
+                  {Object.entries(h.data.workoutLogs).map(([id, logs], idx) => {
+                    const name = h.data.exerciseNames?.[id]
+                      || db.plan[h.data.slotType?.toLowerCase()]?.find((ex) => ex.id === id)?.name
+                      || null;
+                    return (
+                      <div key={`${id}-${idx}`}>• {name ? `${name} — ` : ''}{String(logs?.[0]?.weight || 0)}lb ({Array.isArray(logs) ? logs.map((l) => (l.status === 'success' ? '10' : String(l.reps))).join('•') : ''})</div>
+                    );
+                  })}
                 </div>
               )}
               {h.data?.cardio && (
@@ -2053,26 +1941,8 @@ function SettingsScreen({ db, setDb, onBack, onImportBackup, themeObj }) {
         </button>
       </Card>
 
-      {db.settings.beeps && (
-        <Card themeObj={themeObj} className="mb-4 flex justify-between items-center shadow-sm border-0">
-          <div className="flex items-center gap-3" style={{ color: themeObj.text }}><Zap size={18} /><span className="font-bold">Sound Unlock</span></div>
-          <button
-            onClick={async () => {
-              const ok = await unlockAudio();
-              if (ok) {
-                setDb((prev) => ({ ...prev, settings: { ...prev.settings, audioUnlocked: true } }));
-              }
-            }}
-            className="px-4 py-2 rounded-full border-2 text-xs font-black uppercase tracking-widest outline-none focus-visible:ring-4 focus-visible:ring-blue-500"
-            style={{ borderColor: db.settings.audioUnlocked ? themeObj.success : themeObj.border, backgroundColor: db.settings.audioUnlocked ? themeObj.success : 'transparent', color: db.settings.audioUnlocked ? '#000' : themeObj.textSecondary }}
-          >
-            {db.settings.audioUnlocked ? 'Unlocked' : 'Enable'}
-          </button>
-        </Card>
-      )}
-
       <Card themeObj={themeObj} className="mb-6 flex justify-between items-center shadow-sm border-0">
-        <div className="flex items-center gap-3" style={{ color: themeObj.text }}><Vibrate size={18} /><span className="font-bold">Haptics <span className="text-[10px] font-normal opacity-50">(Android)</span></span></div>
+        <div className="flex items-center gap-3" style={{ color: themeObj.text }}><Vibrate size={18} /><span className="font-bold">Haptics</span></div>
         <button onClick={() => toggleSetting('haptics')} className="px-4 py-2 rounded-full border-2 text-xs font-black uppercase tracking-widest outline-none focus-visible:ring-4 focus-visible:ring-blue-500" style={{ borderColor: db.settings.haptics ? themeObj.primary : themeObj.border, backgroundColor: db.settings.haptics ? themeObj.primary : 'transparent', color: db.settings.haptics ? '#FFF' : themeObj.textSecondary }}>
           {db.settings.haptics ? 'On' : 'Off'}
         </button>
